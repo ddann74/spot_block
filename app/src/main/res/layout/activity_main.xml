@@ -1,0 +1,362 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#121212">
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/app_name"
+        android:textColor="#1DB954"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="12dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Reads on-screen text while Spotify is open, detects an ad, and tries tapping Skip/Next - the same control you already have access to. On Spotify Free that control is often disabled during ads by design; when that happens this app logs it honestly instead of pretending to succeed."
+        android:textColor="#888888"
+        android:textSize="11sp"
+        android:layout_marginBottom="16dp" />
+
+    <Button
+        android:id="@+id/openAccessibilitySettingsButton"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="@string/open_accessibility_settings"
+        android:textColor="#ffffff"
+        android:textAllCaps="false"
+        android:backgroundTint="#1DB954"
+        android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:id="@+id/accessibilityStatusText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Accessibility Service: not checked yet"
+        android:textColor="#cccccc"
+        android:textSize="12sp"
+        android:layout_marginBottom="16dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#2a2a2a"
+        android:padding="10dp"
+        android:layout_marginBottom="20dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/enable_ad_skip"
+            android:textColor="#ffffff"
+            android:textSize="14sp" />
+
+        <Switch
+            android:id="@+id/adSkipEnabledSwitch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Ad Keywords"
+        android:textSize="18sp"
+        android:textColor="#1DB954"
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="On-screen text that means an ad is currently playing. Best-effort defaults, not confirmed against a real device yet - add whatever wording your Spotify build actually shows if these don't match (check Diagnostic Log)."
+        android:textColor="#888888"
+        android:textSize="11sp"
+        android:layout_marginBottom="8dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="8dp">
+
+        <EditText
+            android:id="@+id/adKeywordInput"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:hint="Advertisement"
+            android:textColor="#ffffff"
+            android:textColorHint="#888888"
+            android:background="#2a2a2a"
+            android:padding="8dp"
+            android:singleLine="true"
+            android:layout_marginEnd="8dp" />
+
+        <Button
+            android:id="@+id/addAdKeywordButton"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="@string/add"
+            android:textColor="#ffffff"
+            android:textAllCaps="false"
+            android:backgroundTint="#1DB954" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/adKeywordsContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginBottom="20dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Skip Control Labels"
+        android:textSize="18sp"
+        android:textColor="#1DB954"
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Candidate labels for the Skip/Next control to search for and tap during an ad. Tried in order; the first one found on screen is used."
+        android:textColor="#888888"
+        android:textSize="11sp"
+        android:layout_marginBottom="8dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="8dp">
+
+        <EditText
+            android:id="@+id/skipControlKeywordInput"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:hint="Skip"
+            android:textColor="#ffffff"
+            android:textColorHint="#888888"
+            android:background="#2a2a2a"
+            android:padding="8dp"
+            android:singleLine="true"
+            android:layout_marginEnd="8dp" />
+
+        <Button
+            android:id="@+id/addSkipControlKeywordButton"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="@string/add"
+            android:textColor="#ffffff"
+            android:textAllCaps="false"
+            android:backgroundTint="#1DB954" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/skipControlKeywordsContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginBottom="20dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Target App Packages"
+        android:textSize="18sp"
+        android:textColor="#1DB954"
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Which installed app(s) this is allowed to read/act on. Defaults to standard Spotify - add Spotify Lite's package here if you use that instead."
+        android:textColor="#888888"
+        android:textSize="11sp"
+        android:layout_marginBottom="8dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="8dp">
+
+        <EditText
+            android:id="@+id/targetPackageInput"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:hint="com.spotify.music"
+            android:textColor="#ffffff"
+            android:textColorHint="#888888"
+            android:background="#2a2a2a"
+            android:padding="8dp"
+            android:singleLine="true"
+            android:layout_marginEnd="8dp" />
+
+        <Button
+            android:id="@+id/addTargetPackageButton"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="@string/add"
+            android:textColor="#ffffff"
+            android:textAllCaps="false"
+            android:backgroundTint="#1DB954" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/targetPackagesContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginBottom="20dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Stats"
+        android:textSize="18sp"
+        android:textColor="#1DB954"
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:id="@+id/adsDetectedText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Ads detected: 0"
+        android:textColor="#ffffff"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/skipTappedText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Skip tapped: 0"
+        android:textColor="#ffffff"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/skipBlockedText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Skip blocked (disabled by Spotify): 0"
+        android:textColor="#ffffff"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/skipControlNotFoundText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Skip control not found: 0"
+        android:textColor="#ffffff"
+        android:textSize="13sp"
+        android:layout_marginBottom="8dp" />
+
+    <Button
+        android:id="@+id/clearStatsButton"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:text="@string/clear_stats"
+        android:textColor="#ffffff"
+        android:textAllCaps="false"
+        android:backgroundTint="#616161"
+        android:layout_marginBottom="20dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Activity"
+        android:textSize="18sp"
+        android:textColor="#1DB954"
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:id="@+id/activityLogText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="No activity yet"
+        android:textColor="#cccccc"
+        android:textSize="11sp"
+        android:fontFamily="monospace"
+        android:background="#1a1a1a"
+        android:padding="8dp"
+        android:layout_marginBottom="20dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#2a2a2a"
+        android:padding="10dp"
+        android:layout_marginBottom="8dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/enable_diagnostic_logging"
+            android:textColor="#ffffff"
+            android:textSize="14sp" />
+
+        <Switch
+            android:id="@+id/diagnosticLoggingSwitch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/diagnosticLogSizeText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Diagnostic log: 0.0 KB"
+        android:textColor="#888888"
+        android:textSize="11sp"
+        android:layout_marginBottom="8dp" />
+
+    <Button
+        android:id="@+id/shareDiagnosticLogButton"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:text="@string/share_diagnostic_log"
+        android:textColor="#ffffff"
+        android:textAllCaps="false"
+        android:backgroundTint="#1DB954"
+        android:layout_marginBottom="8dp" />
+
+    <Button
+        android:id="@+id/clearDiagnosticLogButton"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:text="@string/clear_diagnostic_log"
+        android:textColor="#ffffff"
+        android:textAllCaps="false"
+        android:backgroundTint="#616161"
+        android:layout_marginBottom="24dp" />
+
+</LinearLayout>
+</ScrollView>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- packageNames is deliberately omitted here (meaning "all packages") rather
+     than hardcoded to Spotify's package name - SpotifyAdSkipService.kt filters
+     by package itself against a value read from Settings, so the target
+     package can be changed (e.g. a regional/Lite build) without a rebuild. -->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:canRetrieveWindowContent="true"
+    android:notificationTimeout="100"
+    android:description="@string/accessibility_service_description" />
