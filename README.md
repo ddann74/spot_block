@@ -52,6 +52,28 @@ this kind of tool working via its own UI. That means, honestly:
   Log** additionally records the raw on-screen text for that screen - the
   detail actually needed to tune a keyword list.
 
+## Download button (Spotify's own offline download)
+
+A floating **Download** button is drawn over Spotify (the same accessibility
+overlay window TikTok Feed Filter's Block/Download buttons use, so it needs
+no separate "display over other apps" permission). Tapping it searches the
+current screen for Spotify's own **"Download for offline" toggle** - a real
+Spotify Premium feature - and taps it if found.
+
+**What this deliberately is not**: this never downloads anything itself,
+never writes a file, and never touches the network. It only finds and taps
+a control Spotify already put on screen, the same as you tapping it
+yourself - the actual download (and the DRM-protected offline file Spotify
+manages) is entirely Spotify's own feature, requires Premium, and only
+plays back inside the Spotify app. If you don't have Premium, or aren't on
+a screen with a Download toggle (it lives on playlist/album/podcast
+screens, not Now Playing), the button will find nothing and log "Download
+control not found" rather than pretending to succeed.
+
+Turn off **Show Floating Download Button** in Setup if you'd rather not
+have anything drawn over Spotify at all - this doesn't affect ad-skip
+detection, which keeps working either way.
+
 ## This is inherently heuristic - read this before relying on it
 
 There is no official API for "is an ad currently playing" or "skip this ad."
@@ -60,8 +82,9 @@ against their labels, same as TikTok Feed Filter's approach for a different
 app. That means:
 
 - **It will miss things whose wording doesn't match your configured
-  keywords.** Both keyword lists (Ad Keywords, Skip Control Labels) are
-  editable in the app without a rebuild for exactly this reason.
+  keywords.** All three keyword lists (Ad Keywords, Skip Control Labels,
+  Download Control Labels) are editable in the app without a rebuild for
+  exactly this reason.
 - **The default keyword lists are best-effort guesses, not confirmed
   against a real device.** Unlike TikTok Feed Filter (whose keyword lists
   were tuned against real diagnostic logs during development), this project
@@ -104,3 +127,8 @@ app. That means:
 - **Spotify Lite / regional builds** may ship under a different package
   name than `com.spotify.music` - add it under Target App Packages in
   Setup if so.
+- **The Download Control Labels default (`Download`) is also unconfirmed.**
+  Same situation as the ad/skip keywords - if the floating Download button
+  logs "control not found" while you're genuinely on a playlist/album
+  screen with Premium active, check Diagnostic Log's `OVERLAY`/`DOWNLOAD`
+  entries for the real on-screen text and add the actual wording.

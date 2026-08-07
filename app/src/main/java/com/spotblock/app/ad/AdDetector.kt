@@ -9,6 +9,13 @@ package com.spotblock.app.ad
   * screen - a wording mismatch, not a "Spotify blocked this" signal. */
 enum class SkipOutcome { TAPPED, BLOCKED_DISABLED, CONTROL_NOT_FOUND }
 
+/** Outcome of the Download overlay button - only two states, unlike [SkipOutcome]:
+  * Spotify's own Download toggle for a playlist/album (Settings > "Download for
+  * offline") is a real Premium feature with no equivalent to skip's ad-time
+  * disabling - it's simply on or off, always tappable. [CONTROL_NOT_FOUND] covers
+  * both "not on a screen with a Download toggle" and "wording mismatch". */
+enum class DownloadOutcome { TAPPED, CONTROL_NOT_FOUND }
+
 /** [matchedKeyword] is null when no ad is detected, otherwise whichever configured
   * keyword actually matched - carried through so the Activity/Diagnostic log can
   * say exactly what fired, the same way TikTok Feed Filter's ad-keyword match does. */

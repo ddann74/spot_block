@@ -46,10 +46,29 @@ class SettingsRepository(context: Context) {
         get() = parseList(prefs.getString(KEY_SKIP_CONTROL_KEYWORDS, null) ?: DEFAULT_SKIP_CONTROL_KEYWORDS.joinToString(","))
         set(value) = prefs.edit().putString(KEY_SKIP_CONTROL_KEYWORDS, joinList(value)).apply()
 
+    /** The floating Download button drawn over Spotify - on by default since that's
+      * the whole point of the feature, but it's a visible overlay on top of another
+      * app, so a way to turn it off without disabling ad-skip detection is worth
+      * having, same reasoning as TikTok Feed Filter's overlay toggle. */
+    var isOverlayEnabled: Boolean
+        get() = prefs.getBoolean(KEY_OVERLAY_ENABLED, true)
+        set(value) = prefs.edit().putBoolean(KEY_OVERLAY_ENABLED, value).apply()
+
+    /** Candidate labels for Spotify's own "Download for offline" toggle (a real
+      * Premium feature - this only ever taps that existing control, never touches
+      * the network or writes any file itself). Tried in order; the first one found
+      * on the current screen is the one that gets tapped. NOT confirmed against a
+      * real device - see README. */
+    var downloadControlKeywords: List<String>
+        get() = parseList(prefs.getString(KEY_DOWNLOAD_CONTROL_KEYWORDS, null) ?: DEFAULT_DOWNLOAD_CONTROL_KEYWORDS.joinToString(","))
+        set(value) = prefs.edit().putString(KEY_DOWNLOAD_CONTROL_KEYWORDS, joinList(value)).apply()
+
     fun addAdKeyword(keyword: String) = addKeyword(::adKeywords, keyword)
     fun removeAdKeyword(keyword: String) = removeKeyword(::adKeywords, keyword)
     fun addSkipControlKeyword(keyword: String) = addKeyword(::skipControlKeywords, keyword)
     fun removeSkipControlKeyword(keyword: String) = removeKeyword(::skipControlKeywords, keyword)
+    fun addDownloadControlKeyword(keyword: String) = addKeyword(::downloadControlKeywords, keyword)
+    fun removeDownloadControlKeyword(keyword: String) = removeKeyword(::downloadControlKeywords, keyword)
 
     /** Shared add/remove for the keyword lists above, which are all plain "unique,
       * case-insensitive, order-preserving" lists - takes a property reference so
@@ -87,6 +106,8 @@ class SettingsRepository(context: Context) {
         private const val KEY_TARGET_PACKAGES = "target_packages"
         private const val KEY_AD_KEYWORDS = "ad_keywords"
         private const val KEY_SKIP_CONTROL_KEYWORDS = "skip_control_keywords"
+        private const val KEY_OVERLAY_ENABLED = "overlay_enabled"
+        private const val KEY_DOWNLOAD_CONTROL_KEYWORDS = "download_control_keywords"
 
         // Spotify's official Android package. A regional/Lite build under a
         // different package name would need adding manually in Setup.
@@ -100,5 +121,11 @@ class SettingsRepository(context: Context) {
         // "Skip" alone is deliberately last and most generic - "Skip Ad" is more
         // specific and preferred when both match the same screen.
         val DEFAULT_SKIP_CONTROL_KEYWORDS = listOf("Skip Ad", "Skip", "Next")
+
+        // Best-effort guess at Spotify's Download toggle contentDescription/label,
+        // NOT confirmed against a real device - see README. Spotify's own Download
+        // control lives on playlist/album/podcast screens (not Now Playing), so
+        // this only ever finds anything while viewing one of those.
+        val DEFAULT_DOWNLOAD_CONTROL_KEYWORDS = listOf("Download")
     }
 }

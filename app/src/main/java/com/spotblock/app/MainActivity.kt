@@ -43,6 +43,7 @@ class MainActivity : AppCompatActivity() {
 
         setupListeners()
         binding.adSkipEnabledSwitch.isChecked = settingsRepository.isAdSkipEnabled
+        binding.overlayEnabledSwitch.isChecked = settingsRepository.isOverlayEnabled
         binding.diagnosticLoggingSwitch.isChecked = settingsRepository.isDiagnosticLoggingEnabled
         renderAllLists()
         refreshStats()
@@ -66,6 +67,9 @@ class MainActivity : AppCompatActivity() {
         binding.adSkipEnabledSwitch.setOnCheckedChangeListener { _, isChecked ->
             settingsRepository.isAdSkipEnabled = isChecked
         }
+        binding.overlayEnabledSwitch.setOnCheckedChangeListener { _, isChecked ->
+            settingsRepository.isOverlayEnabled = isChecked
+        }
         binding.diagnosticLoggingSwitch.setOnCheckedChangeListener { _, isChecked ->
             settingsRepository.isDiagnosticLoggingEnabled = isChecked
         }
@@ -83,6 +87,13 @@ class MainActivity : AppCompatActivity() {
             settingsRepository.addSkipControlKeyword(keyword)
             binding.skipControlKeywordInput.setText("")
             renderSkipControlKeywords()
+        }
+        binding.addDownloadControlKeywordButton.setOnClickListener {
+            val keyword = binding.downloadControlKeywordInput.text.toString().trim()
+            if (keyword.isEmpty()) return@setOnClickListener
+            settingsRepository.addDownloadControlKeyword(keyword)
+            binding.downloadControlKeywordInput.setText("")
+            renderDownloadControlKeywords()
         }
         binding.addTargetPackageButton.setOnClickListener {
             val pkg = binding.targetPackageInput.text.toString().trim()
@@ -109,6 +120,8 @@ class MainActivity : AppCompatActivity() {
         binding.skipTappedText.text = "Skip tapped: ${statsRepository.skipTapped}"
         binding.skipBlockedText.text = "Skip blocked (disabled by Spotify): ${statsRepository.skipBlocked}"
         binding.skipControlNotFoundText.text = "Skip control not found: ${statsRepository.skipControlNotFound}"
+        binding.downloadTappedText.text = "Download tapped: ${statsRepository.downloadTapped}"
+        binding.downloadControlNotFoundText.text = "Download control not found: ${statsRepository.downloadControlNotFound}"
         val log = statsRepository.recentLog()
         binding.activityLogText.text = if (log.isEmpty()) "No activity yet" else log.joinToString("\n")
 
@@ -134,6 +147,7 @@ class MainActivity : AppCompatActivity() {
     private fun renderAllLists() {
         renderAdKeywords()
         renderSkipControlKeywords()
+        renderDownloadControlKeywords()
         renderTargetPackages()
     }
 
@@ -148,6 +162,13 @@ class MainActivity : AppCompatActivity() {
         renderList(binding.skipControlKeywordsContainer, settingsRepository.skipControlKeywords) { keyword ->
             settingsRepository.removeSkipControlKeyword(keyword)
             renderSkipControlKeywords()
+        }
+    }
+
+    private fun renderDownloadControlKeywords() {
+        renderList(binding.downloadControlKeywordsContainer, settingsRepository.downloadControlKeywords) { keyword ->
+            settingsRepository.removeDownloadControlKeyword(keyword)
+            renderDownloadControlKeywords()
         }
     }
 

@@ -22,7 +22,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Reads on-screen text while Spotify is open, detects an ad, and tries tapping Skip/Next - the same control you already have access to. On Spotify Free that control is often disabled during ads by design; when that happens this app logs it honestly instead of pretending to succeed."
+        android:text="Reads on-screen text while Spotify is open, detects an ad, and tries tapping Skip/Next - the same control you already have access to. On Spotify Free that control is often disabled during ads by design; when that happens this app logs it honestly instead of pretending to succeed. A floating Download button also lets you tap Spotify's own &quot;Download for offline&quot; toggle from a playlist/album/podcast screen - a real Premium feature, not something this app implements itself."
         android:textColor="#888888"
         android:textSize="11sp"
         android:layout_marginBottom="16dp" />
@@ -65,6 +65,30 @@
 
         <Switch
             android:id="@+id/adSkipEnabledSwitch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#2a2a2a"
+        android:padding="10dp"
+        android:layout_marginBottom="20dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/enable_overlay"
+            android:textColor="#ffffff"
+            android:textSize="14sp" />
+
+        <Switch
+            android:id="@+id/overlayEnabledSwitch"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content" />
 
@@ -181,6 +205,60 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:text="Download Control Labels"
+        android:textSize="18sp"
+        android:textColor="#1DB954"
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Candidate labels for Spotify's own &quot;Download for offline&quot; toggle (a real Premium feature - this only ever taps that existing control, it never touches the network or writes a file itself). The floating Download button searches for one of these on the current screen; a playlist/album/podcast screen, not Now Playing."
+        android:textColor="#888888"
+        android:textSize="11sp"
+        android:layout_marginBottom="8dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="8dp">
+
+        <EditText
+            android:id="@+id/downloadControlKeywordInput"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:hint="Download"
+            android:textColor="#ffffff"
+            android:textColorHint="#888888"
+            android:background="#2a2a2a"
+            android:padding="8dp"
+            android:singleLine="true"
+            android:layout_marginEnd="8dp" />
+
+        <Button
+            android:id="@+id/addDownloadControlKeywordButton"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="@string/add"
+            android:textColor="#ffffff"
+            android:textAllCaps="false"
+            android:backgroundTint="#1DB954" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/downloadControlKeywordsContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginBottom="20dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:text="Target App Packages"
         android:textSize="18sp"
         android:textColor="#1DB954"
@@ -270,6 +348,22 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Skip control not found: 0"
+        android:textColor="#ffffff"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/downloadTappedText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Download tapped: 0"
+        android:textColor="#ffffff"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/downloadControlNotFoundText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Download control not found: 0"
         android:textColor="#ffffff"
         android:textSize="13sp"
         android:layout_marginBottom="8dp" />
