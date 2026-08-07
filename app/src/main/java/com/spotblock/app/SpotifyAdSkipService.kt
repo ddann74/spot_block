@@ -1,6 +1,7 @@
 package com.spotblock.app
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
@@ -73,7 +74,12 @@ class SpotifyAdSkipService : AccessibilityService() {
             // switch away from Spotify is followed by silence from Spotify's own
             // events, so a short delayed hide - cancelled below the moment a
             // Spotify event arrives - tells the two apart without visibly
-            // flashing the overlay for every unrelated event in between.
+            // flashing the overlay for every unrelated event in between. Removes
+            // any already-pending instance first - postDelayed on its own would
+            // otherwise queue a new one on every single such event without
+            // cancelling the last, piling up redundant callbacks (harmless today
+            // only because hide() happens to be idempotent).
+            mainHandler.removeCallbacks(hideOverlayRunnable)
             mainHandler.postDelayed(hideOverlayRunnable, OVERLAY_HIDE_DELAY_MILLIS)
             return
         }
@@ -132,6 +138,19 @@ class SpotifyAdSkipService : AccessibilityService() {
         diagnosticLog.log("SERVICE", "onInterrupt")
         mainHandler.removeCallbacks(hideOverlayRunnable)
         overlayController.hide()
+    }
+
+    /** Fires when the accessibility service is disabled from Settings (or the app
+      * is otherwise unbound) - onInterrupt alone does NOT cover this path. Without
+      * this, disabling the service while the overlay is showing would leak its
+      * WindowManager-attached view: it'd keep rendering over Spotify bound to a
+      * listener on a service instance Android is tearing down, until the process
+      * happens to die. */
+    override fun onUnbind(intent: Intent?): Boolean {
+        diagnosticLog.log("SERVICE", "onUnbind")
+        mainHandler.removeCallbacks(hideOverlayRunnable)
+        overlayController.hide()
+        return super.onUnbind(intent)
     }
 
     /** The overlay button tap arrives outside the normal accessibility-event flow, so
