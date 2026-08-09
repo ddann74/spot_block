@@ -111,17 +111,33 @@ extend it to optionally start local playback alongside taking focus,
 rather than adding a second, parallel controller that duplicates the
 same lifecycle.
 
+**Queue decision (resolved 2026-08-09):** a folder, not a single track -
+picked once via `ACTION_OPEN_DOCUMENT_TREE`, every audio file inside
+becomes the queue, played in filename order. Each new ad occurrence
+restarts the queue at track 1 (not a "resume where the last ad left off"
+model - simpler, more predictable, matches "an ad break gets some music,
+not a persistent background stream"). If a track finishes before the ad
+clears, the next one in the folder starts automatically; if the whole
+queue finishes first, it wraps back to track 1 rather than going silent.
+
 **Rough design:**
 - New `SettingsRepository` fields: `isLocalMusicDuringAdsEnabled`
   (default **off**, same reasoning as every other toggle here) and a
-  stored URI (or list of URIs, if multiple tracks should be picked
-  from) for the local track(s) - chosen via the Storage Access Framework
-  (`ACTION_OPEN_DOCUMENT`/`ACTION_OPEN_DOCUMENT_TREE`) so this doesn't
-  need a broad storage-read permission, just a persisted URI permission
-  for whatever the user explicitly picks.
-- Playback via `MediaPlayer` (simplest fit for "play this one local
-  file") - `ExoPlayer` only worth it if this grows playlist/queue
-  features later, not needed for a v1.
+  single persisted folder URI (`ACTION_OPEN_DOCUMENT_TREE`, via
+  `ContentResolver.takePersistableUriPermission` so it survives reboots
+  without re-picking) - not a list of individual file URIs, since the
+  queue is "everything in this folder," not a hand-picked set.
+- Enumerate the folder's contents via `DocumentFile.fromTreeUri(...).listFiles()`,
+  filtered to audio MIME types, sorted by display name - this is the
+  queue. Re-enumerate each time the setting is opened/changed (files
+  may be added/removed on disk between ad breaks) rather than caching
+  the list indefinitely.
+- Playback via `MediaPlayer` (simplest fit here) with
+  `setOnCompletionListener` advancing to the next queue index (wrapping
+  to 0 at the end) and starting that track immediately - this is what
+  makes it a queue rather than one looping file. `ExoPlayer` isn't
+  needed for this; `MediaPlayer`'s completion callback is sufficient for
+  sequential playback.
 - Audio focus: request transient focus
   (`AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK` or plain
   `AUDIOFOCUS_GAIN_TRANSIENT`, decide which during implementation - MAY_DUCK
@@ -168,19 +184,23 @@ same lifecycle.
 - Needs its own real-device diagnostic-log validation before calling it
   confirmed, same standard as everything else in this file.
 
-**Open questions to resolve during implementation, not now:**
-1. Single configured track (loops if the ad break outlasts it) vs. a
-   folder/playlist to pick from (random, or in order)? Simpler v1 is
-   probably one track, looped - decide before building the picker UI.
-2. Should the local track resume from where it left off across separate
-   ad breaks (feels more like "your own background music"), or always
-   restart from the beginning (simpler, more predictable)?
-3. `AUDIOFOCUS_GAIN_TRANSIENT` (Spotify fully pauses, cleanest swap) vs.
-   `..._MAY_DUCK` (Spotify keeps playing quietly underneath - defeats the
-   point of not hearing the ad) - this isn't actually a toss-up once
-   stated plainly; leaning `AUDIOFOCUS_GAIN_TRANSIENT`, but confirm
-   against real behavior since focus handling varies by Android version.
+**Open questions, resolved so far:**
+1. ~~Single track vs. folder/playlist?~~ Resolved above: folder, in
+   filename order, restarts at track 1 each new ad, wraps if it outlasts
+   the ad break.
+2. ~~Resume across ad breaks vs. restart?~~ Resolved above: always
+   restarts at track 1.
+3. `AUDIOFOCUS_GAIN_TRANSIENT` vs. `..._MAY_DUCK` - already decided and
+   built this way for auto-mute (`AdAudioController` uses plain
+   `AUDIOFOCUS_GAIN_TRANSIENT`), so this feature inherits that choice by
+   extending the same controller rather than re-deciding it.
+
+**Still open:**
 4. Does this need `FOREGROUND_SERVICE`/media-session integration to play
    reliably from an `AccessibilityService` context, or does simple
    `MediaPlayer` playback work fine from there? Needs checking against
    real Android docs/a real device, not assumed.
+5. What if the picked folder is empty or contains no recognizable audio
+   files - fall back the same way as "no folder configured" (per the
+   fallback behavior above), or a distinct Stats/log message so it's
+   clear the folder itself is the problem, not a missing setting?
