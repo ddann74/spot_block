@@ -6,6 +6,8 @@ control - the same control you'd tap yourself. It never modifies audio, never
 intercepts or reverse-engineers Spotify's network traffic, and never acts on
 anything outside Spotify itself.
 
+Planned (not yet built) work is tracked in [`TODO.md`](TODO.md).
+
 ## Read this before installing
 
 **Spotify's free tier deliberately disables Skip/Next/Previous during an ad.**
