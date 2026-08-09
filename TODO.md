@@ -277,22 +277,33 @@ queue finishes first, it wraps back to track 1 rather than going silent.
 `SpotifyAdSkipService.kt` all compiled (same standalone Kotlin 1.9.24 /
 real `android-all` jar technique used for auto-mute) and type-check
 against the real framework API surface they use. `AdMusicPlaybackService.kt`
-itself could **not** be compiled here - `androidx.media3` isn't reachable
-from this sandbox (Google-Maven-only, confirmed via a 404 from Maven
-Central), so this file is unverified beyond careful manual review against
-media3's documented public API. To still verify the *calling* code
-correctly, a scratch-only stub matching `AdMusicPlaybackService`'s real
-public method signatures (never committed) stood in for it while
-compile-checking `AdAudioController`/`SpotifyAdSkipService` - meaningful
-for catching call-site errors, but it cannot catch a mistake inside
-`AdMusicPlaybackService`'s own body. `MainActivity.kt`'s UI wiring
-couldn't be compiled either (needs the Gradle-generated
-`ActivityMainBinding`), but every new `binding.X` reference was manually
-cross-checked against `activity_main.xml`'s `android:id` values. None of
-this has been run on a real device - whether ExoPlayer actually plays,
-whether the foreground service starts in time, and whether the fade
-sounds right all still need a real-device session, the same as auto-mute
-above.
+itself could **not** be compiled in this project's sandbox -
+`androidx.media3` isn't reachable from there (Google-Maven-only,
+confirmed via a 404 from Maven Central), so it shipped unverified beyond
+careful manual review against media3's documented public API. To still
+verify the *calling* code, a scratch-only stub matching
+`AdMusicPlaybackService`'s real public method signatures (never
+committed) stood in for it while compile-checking
+`AdAudioController`/`SpotifyAdSkipService`.
+
+**Confirmed on the first real Gradle build (2026-08-09):** that
+disclosed gap was real - `AdMusicPlaybackService.kt` failed to compile.
+`onDestroy()` used `mediaSession?.run { player = null; ... }`, and
+`MediaSession` has its own non-null `player: Player` property that
+shadowed the outer class's nullable `player` field inside that lambda's
+implicit-receiver scope, so `player = null` resolved to the wrong
+property ("Null can not be a value of a non-null type Player"). Fixed by
+dropping the `run` block and setting both fields explicitly with no
+implicit receiver - `:app:assembleDebug` has not been re-run since, so
+this fix itself is not yet confirmed clean, though it's a small,
+mechanical change. `MainActivity.kt`'s UI wiring couldn't be compiled in
+this sandbox either (needs the Gradle-generated `ActivityMainBinding`),
+but every new `binding.X` reference was manually cross-checked against
+`activity_main.xml`'s `android:id` values - unconfirmed by a real build
+either way yet. Nothing has run on a real device - whether ExoPlayer
+actually plays, whether the foreground service starts in time, and
+whether the fade sounds right all still need a real-device session, the
+same as auto-mute above.
 
 **Open questions, resolved so far:**
 1. ~~Single track vs. folder/playlist?~~ Resolved above: folder, in

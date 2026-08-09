@@ -43,17 +43,17 @@ import androidx.media3.session.MediaSessionService
  * focus here would be a second, redundant request for the same logical
  * action, and could interact with the first unpredictably.
  *
- * UNVERIFIED BEYOND CAREFUL REVIEW: unlike most of this project's other
- * new code, this file could NOT be compiled against a real API jar while
- * writing it - androidx.media3 is published only on Google's Maven repo
- * (dl.google.com), which this sandbox cannot reach (the same restriction
- * that blocks the full Gradle/Android build everywhere else in this
- * project). This was written from accurate, specific knowledge of the
- * media3 API rather than guessed, but has not been compiled, let alone
- * run - open this in Android Studio and let Gradle resolve the real
- * dependency before trusting it compiles, and confirm on a real device
- * that a legitimate system notification appears while local music plays
- * (MediaSessionService's default behavior, expected but not confirmed).
+ * Compiled once for real (2026-08-09, first Gradle build) - caught one
+ * genuine bug: `onDestroy()` originally used `mediaSession?.run { player
+ * = null; ... }`, and `MediaSession` itself has a non-null `player:
+ * Player` property that shadowed the outer class's nullable `player`
+ * field inside that lambda's implicit receiver scope, so `player = null`
+ * resolved to the wrong property and failed to compile ("Null can not be
+ * a value of a non-null type Player"). Fixed by dropping the `run` block
+ * and setting both fields explicitly with no implicit receiver. Still
+ * not run on a real device - confirm a legitimate system notification
+ * appears while local music plays (MediaSessionService's default
+ * behavior, expected but not yet confirmed).
  */
 class AdMusicPlaybackService : MediaSessionService() {
 
@@ -103,12 +103,10 @@ class AdMusicPlaybackService : MediaSessionService() {
     fun currentVolume(): Float = player?.volume ?: 0f
 
     override fun onDestroy() {
-        mediaSession?.run {
-            player?.release()
-            player = null
-            release()
-            mediaSession = null
-        }
+        player?.release()
+        player = null
+        mediaSession?.release()
+        mediaSession = null
         if (instance === this) instance = null
         super.onDestroy()
     }
