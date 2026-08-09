@@ -16,6 +16,20 @@ class SettingsRepository(context: Context) {
         get() = prefs.getBoolean(KEY_AD_SKIP_ENABLED, true)
         set(value) = prefs.edit().putBoolean(KEY_AD_SKIP_ENABLED, value).apply()
 
+    /** Off by default, unlike [isAdSkipEnabled] - this is the authorized-but-newer
+      * design-philosophy exception (see README.md's Design philosophy section):
+      * requests transient audio focus while an ad is detected, which causes Spotify
+      * to pause/duck its own playback, then releases it once the ad clears. Never
+      * touches Spotify's own stream/volume directly - see
+      * [com.spotblock.app.audio.AdAudioController]'s own doc comment for why. Off
+      * by default, same reasoning as [isDiagnosticLoggingEnabled]: an unrequested
+      * behavior change on first install is worse than an extra toggle to find, and
+      * this hasn't been confirmed on a real device the way the ad/skip keyword
+      * defaults have been - see TODO.md. */
+    var isAutoMuteEnabled: Boolean
+        get() = prefs.getBoolean(KEY_AUTO_MUTE_ENABLED, false)
+        set(value) = prefs.edit().putBoolean(KEY_AUTO_MUTE_ENABLED, value).apply()
+
     /** Off by default - the diagnostic log is verbose (every screen evaluation, raw
       * on-screen text, every skip attempt and its outcome) by design, since that
       * detail is exactly what's needed to tell why a skip did or didn't happen, but
@@ -102,6 +116,7 @@ class SettingsRepository(context: Context) {
     companion object {
         private const val PREFS_NAME = "spot_block_settings"
         private const val KEY_AD_SKIP_ENABLED = "ad_skip_enabled"
+        private const val KEY_AUTO_MUTE_ENABLED = "auto_mute_enabled"
         private const val KEY_DIAGNOSTIC_LOGGING_ENABLED = "diagnostic_logging_enabled"
         private const val KEY_TARGET_PACKAGES = "target_packages"
         private const val KEY_AD_KEYWORDS = "ad_keywords"

@@ -43,6 +43,7 @@ class MainActivity : AppCompatActivity() {
 
         setupListeners()
         binding.adSkipEnabledSwitch.isChecked = settingsRepository.isAdSkipEnabled
+        binding.autoMuteEnabledSwitch.isChecked = settingsRepository.isAutoMuteEnabled
         binding.overlayEnabledSwitch.isChecked = settingsRepository.isOverlayEnabled
         binding.diagnosticLoggingSwitch.isChecked = settingsRepository.isDiagnosticLoggingEnabled
         renderAllLists()
@@ -66,6 +67,9 @@ class MainActivity : AppCompatActivity() {
         }
         binding.adSkipEnabledSwitch.setOnCheckedChangeListener { _, isChecked ->
             settingsRepository.isAdSkipEnabled = isChecked
+        }
+        binding.autoMuteEnabledSwitch.setOnCheckedChangeListener { _, isChecked ->
+            settingsRepository.isAutoMuteEnabled = isChecked
         }
         binding.overlayEnabledSwitch.setOnCheckedChangeListener { _, isChecked ->
             settingsRepository.isOverlayEnabled = isChecked
@@ -122,6 +126,8 @@ class MainActivity : AppCompatActivity() {
         binding.skipControlNotFoundText.text = "Skip control not found: ${statsRepository.skipControlNotFound}"
         binding.downloadTappedText.text = "Download tapped: ${statsRepository.downloadTapped}"
         binding.downloadControlNotFoundText.text = "Download control not found: ${statsRepository.downloadControlNotFound}"
+        binding.autoMuteEngagedText.text = "Ads silenced (audio focus): ${statsRepository.autoMuteEngaged}"
+        binding.autoMuteFocusDeniedText.text = "Silence attempt denied: ${statsRepository.autoMuteFocusDenied}"
         val log = statsRepository.recentLog()
         binding.activityLogText.text = if (log.isEmpty()) "No activity yet" else log.joinToString("\n")
 

@@ -4,10 +4,12 @@ An Android accessibility-service app that watches Spotify's on-screen text for
 signs an ad is playing and, if it finds one, tries tapping the Skip/Next
 control - the same control you'd tap yourself. It never intercepts or
 reverse-engineers Spotify's network traffic, never modifies Spotify's own
-audio stream, and never acts on anything outside Spotify itself. Two
-planned (not yet built - see `TODO.md`) features will have it manage the
-*device's own* local audio output during an ad instead - see **Design
-philosophy** below for why that's a deliberate, authorized exception.
+audio stream, and never acts on anything outside Spotify itself. It can
+also (optionally, off by default) request audio focus to pause/duck
+Spotify's own playback during an ad - see **Design philosophy** below for
+why that's a deliberate, authorized exception, not a contradiction. A
+further planned feature (playing a local song during that window instead
+of silence) is tracked in [`TODO.md`](TODO.md), not yet built.
 
 Planned (not yet built) work is tracked in [`TODO.md`](TODO.md).
 
@@ -41,16 +43,18 @@ Principles this project holds itself to:
 **Authorized expansion (2026-08-09):** principle 4 originally read "never
 modifies audio" without qualification. The project owner explicitly
 authorized broadening it to allow *device-level, local-only* audio
-control - muting the device's own media volume during a detected ad, and
-(planned, see `TODO.md`) substituting a locally-stored song for the ad's
-audio during that window. Both stay inside every other principle above
-unchanged: Spotify's own stream, network traffic, and ad-completion
-accounting are never touched - Spotify still plays the ad in full and
-gets credited for it exactly as if the app didn't exist. What changed is
-narrowly what happens to the device's own concurrent audio output during
-that window, which a user could already do manually (mute Spotify, open
-a different player, switch back) - this only automates that, per
-principle 1. Principle 4 is retired as originally worded; its
+control - built today as requesting transient audio focus during a
+detected ad (causing Spotify to pause/duck itself, standard behavior for
+any well-behaved media app - not a direct volume/stream manipulation),
+and (planned, see `TODO.md`) extending that to play a locally-stored song
+during that same window instead of silence. Both stay inside every other
+principle above unchanged: Spotify's own stream, network traffic, and
+ad-completion accounting are never touched - Spotify still plays the ad
+in full and gets credited for it exactly as if the app didn't exist. What
+changed is narrowly what happens to the device's own concurrent audio
+output during that window, which a user could already do manually (mute
+Spotify, open a different player, switch back) - this only automates
+that, per principle 1. Principle 4 is retired as originally worded; its
 network/stream/data half is now covered by this list's other principles
 (none of which changed), and its audio half is superseded by this note.
 
@@ -104,6 +108,32 @@ this kind of tool working via its own UI. That means, honestly:
   Log** additionally records the raw on-screen text for that screen - the
   detail actually needed to tune a keyword list.
 
+## Silence Ads (off by default)
+
+When enabled (**Setup > Silence Ads (Audio Focus)**), the moment an ad is
+detected the app requests transient audio focus - the same mechanism a
+navigation app's turn-by-turn prompt or a notification sound uses to duck
+whatever's currently playing. Android delivers a focus-loss callback to
+Spotify, which (being a well-behaved media app) pauses or ducks its own
+playback in response. When the ad clears, the app releases focus and
+Spotify reacquires it and resumes.
+
+This never touches Spotify's own stream, network traffic, or volume -
+see **Design philosophy** above for the full reasoning, and
+`AdAudioController`'s doc comment in source for the implementation
+detail on why this replaced an earlier, discarded design that would have
+called `AudioManager.setStreamVolume()` directly (Android's own docs
+recommend against that specifically because it affects every app sharing
+a stream, not just Spotify).
+
+**Not yet confirmed on a real device** - unlike the ad/skip keyword
+defaults (see Known Open Items), this hasn't been validated against an
+actual ad session yet. It compiles correctly against the real Android
+API and the logic has been reviewed carefully, but whether Spotify
+actually pauses/ducks the way expected needs a real diagnostic-log
+session to confirm. Stats screen shows "Ads silenced (audio focus)" /
+"Silence attempt denied" counters once you've tried it.
+
 ## Download button (Spotify's own offline download)
 
 A floating **Download** button is drawn over Spotify (the same accessibility
@@ -148,6 +178,11 @@ app. That means:
 - **A Spotify UI update can silently break this** the same way a TikTok
   update could break the sibling project - if it stops working, the
   Diagnostic Log is the way to see what changed.
+- **Silence Ads (audio focus) is unconfirmed on a real device** - built,
+  compiles against the real Android API, but not yet run against an
+  actual ad session the way the ad/skip keyword defaults have been. If
+  you try it, check Stats' "Ads silenced" / "Silence attempt denied"
+  counters and, ideally, a Diagnostic Log session afterward.
 
 ## Setup
 

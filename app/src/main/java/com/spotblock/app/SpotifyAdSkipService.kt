@@ -9,6 +9,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import com.spotblock.app.ad.AdDetector
 import com.spotblock.app.ad.DownloadOutcome
 import com.spotblock.app.ad.SkipOutcome
+import com.spotblock.app.audio.AdAudioController
 import com.spotblock.app.diagnostics.DiagnosticLog
 import com.spotblock.app.overlay.OverlayController
 
@@ -19,8 +20,11 @@ import com.spotblock.app.overlay.OverlayController
  * not a false "success" - if the control exists but is disabled, which is the
  * expected, common case on Spotify Free (skip is deliberately disabled for the
  * duration of an ad on that tier). This only ever taps a control already visible on
- * screen; it never modifies audio, never touches the network, and never acts on
- * anything outside the configured target package(s).
+ * screen; it never modifies Spotify's own audio stream or network traffic, and
+ * never acts on anything outside the configured target package(s). Optionally (off
+ * by default, see SettingsRepository.isAutoMuteEnabled) also requests audio focus
+ * via AdAudioController while an ad is detected - see that class's doc comment for
+ * why that's a deliberate, narrower exception than "modifies audio" sounds like.
  */
 class SpotifyAdSkipService : AccessibilityService() {
 
@@ -28,6 +32,7 @@ class SpotifyAdSkipService : AccessibilityService() {
     private lateinit var statsRepository: StatsRepository
     private lateinit var diagnosticLog: DiagnosticLog
     private lateinit var overlayController: OverlayController
+    private lateinit var adAudioController: AdAudioController
 
     // True once a skip has been attempted (tapped, found-but-disabled, or
     // not-found) for whichever ad is CURRENTLY on screen - reset the moment the
@@ -53,6 +58,7 @@ class SpotifyAdSkipService : AccessibilityService() {
             diagnosticLog = diagnosticLog,
             onDownloadTapped = { handleOverlayDownloadTapped() }
         )
+        adAudioController = AdAudioController(this)
         diagnosticLog.log("SERVICE", "onServiceConnected")
     }
 
@@ -99,6 +105,10 @@ class SpotifyAdSkipService : AccessibilityService() {
         if (!evaluation.isAdPlaying) {
             if (hasAttemptedCurrentAd) {
                 diagnosticLog.log("AD", "ad no longer detected - ready for the next one")
+                if (settingsRepository.isAutoMuteEnabled) {
+                    adAudioController.stopMuting()
+                    diagnosticLog.log("MUTE", "released audio focus")
+                }
             }
             hasAttemptedCurrentAd = false
             @Suppress("DEPRECATION")
@@ -117,6 +127,12 @@ class SpotifyAdSkipService : AccessibilityService() {
         }
         hasAttemptedCurrentAd = true
         statsRepository.recordAdDetected(evaluation.matchedKeyword!!)
+
+        if (settingsRepository.isAutoMuteEnabled) {
+            val muteOutcome = adAudioController.startMuting()
+            diagnosticLog.log("MUTE", "outcome=$muteOutcome")
+            statsRepository.recordMuteOutcome(muteOutcome)
+        }
 
         val controlNode = findControlNode(root, settingsRepository.skipControlKeywords)
         val outcome = when {
@@ -138,6 +154,7 @@ class SpotifyAdSkipService : AccessibilityService() {
         diagnosticLog.log("SERVICE", "onInterrupt")
         mainHandler.removeCallbacks(hideOverlayRunnable)
         overlayController.hide()
+        adAudioController.stopMuting()
     }
 
     /** Fires when the accessibility service is disabled from Settings (or the app
@@ -145,11 +162,14 @@ class SpotifyAdSkipService : AccessibilityService() {
       * this, disabling the service while the overlay is showing would leak its
       * WindowManager-attached view: it'd keep rendering over Spotify bound to a
       * listener on a service instance Android is tearing down, until the process
-      * happens to die. */
+      * happens to die. Same reasoning applies to held audio focus: without this,
+      * disabling the service mid-ad would leave Spotify permanently ducked/paused
+      * with nothing left to ever release the focus request holding it that way. */
     override fun onUnbind(intent: Intent?): Boolean {
         diagnosticLog.log("SERVICE", "onUnbind")
         mainHandler.removeCallbacks(hideOverlayRunnable)
         overlayController.hide()
+        adAudioController.stopMuting()
         return super.onUnbind(intent)
     }
 

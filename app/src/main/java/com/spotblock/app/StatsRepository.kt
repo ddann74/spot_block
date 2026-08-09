@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.spotblock.app.ad.DownloadOutcome
 import com.spotblock.app.ad.SkipOutcome
+import com.spotblock.app.audio.MuteOutcome
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -21,6 +22,8 @@ class StatsRepository(context: Context) {
     val skipControlNotFound: Int get() = prefs.getInt(KEY_SKIP_CONTROL_NOT_FOUND, 0)
     val downloadTapped: Int get() = prefs.getInt(KEY_DOWNLOAD_TAPPED, 0)
     val downloadControlNotFound: Int get() = prefs.getInt(KEY_DOWNLOAD_CONTROL_NOT_FOUND, 0)
+    val autoMuteEngaged: Int get() = prefs.getInt(KEY_AUTO_MUTE_ENGAGED, 0)
+    val autoMuteFocusDenied: Int get() = prefs.getInt(KEY_AUTO_MUTE_FOCUS_DENIED, 0)
 
     fun recentLog(): List<String> {
         val raw = prefs.getString(KEY_LOG, null) ?: return emptyList()
@@ -65,6 +68,20 @@ class StatsRepository(context: Context) {
         appendLogEntry(entry)
     }
 
+    fun recordMuteOutcome(outcome: MuteOutcome) {
+        val entry = when (outcome) {
+            MuteOutcome.ENGAGED -> {
+                increment(KEY_AUTO_MUTE_ENGAGED)
+                "Requested audio focus to silence ad"
+            }
+            MuteOutcome.FOCUS_REQUEST_DENIED -> {
+                increment(KEY_AUTO_MUTE_FOCUS_DENIED)
+                "Audio focus request denied - another app may be holding it"
+            }
+        }
+        appendLogEntry(entry)
+    }
+
     fun recordEvent(message: String) {
         appendLogEntry(message)
     }
@@ -91,6 +108,8 @@ class StatsRepository(context: Context) {
         private const val KEY_SKIP_CONTROL_NOT_FOUND = "skip_control_not_found"
         private const val KEY_DOWNLOAD_TAPPED = "download_tapped"
         private const val KEY_DOWNLOAD_CONTROL_NOT_FOUND = "download_control_not_found"
+        private const val KEY_AUTO_MUTE_ENGAGED = "auto_mute_engaged"
+        private const val KEY_AUTO_MUTE_FOCUS_DENIED = "auto_mute_focus_denied"
         private const val KEY_LOG = "recent_log"
         private const val MAX_LOG_ENTRIES = 50
     }

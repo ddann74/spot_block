@@ -83,6 +83,30 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:text="@string/enable_auto_mute"
+            android:textColor="#ffffff"
+            android:textSize="14sp" />
+
+        <Switch
+            android:id="@+id/autoMuteEnabledSwitch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#2a2a2a"
+        android:padding="10dp"
+        android:layout_marginBottom="20dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:text="@string/enable_overlay"
             android:textColor="#ffffff"
             android:textSize="14sp" />
@@ -364,6 +388,22 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Download control not found: 0"
+        android:textColor="#ffffff"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/autoMuteEngagedText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Ads silenced (audio focus): 0"
+        android:textColor="#ffffff"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/autoMuteFocusDeniedText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Silence attempt denied: 0"
         android:textColor="#ffffff"
         android:textSize="13sp"
         android:layout_marginBottom="8dp" />

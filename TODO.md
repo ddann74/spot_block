@@ -7,63 +7,75 @@ change recorded in README.md's **Design philosophy** section
 ad is in scope; Spotify's own stream, network traffic, and ad-completion
 accounting are still never touched, unconditionally.
 
-## Auto-mute during ads
+## Auto-mute during ads - BUILT (2026-08-09), unverified on a real device
 
-**What it does:** when `AdDetector` reports an ad is playing, automatically
-silence the device's media volume; when the ad is no longer detected,
-restore the volume to whatever it was right before muting.
+**What it does:** when an ad is detected, `AdAudioController` requests
+transient audio focus (`AUDIOFOCUS_GAIN_TRANSIENT`), which causes Spotify
+to receive a focus-loss callback and pause/duck its own playback -
+standard behavior for any well-behaved media app. When the ad clears, the
+focus request is abandoned and Spotify reacquires focus and resumes.
 
-**Why this is a different, lesser boundary than what the README currently
-rules out.** The README's existing "no audio manipulation, no muting the
-stream" line was written about *Spotify's own audio stream/playback* -
-touching what Spotify sends, intercepting it, or interfering with its
-ad-completion tracking, which would be a real step toward circumventing
-Spotify's ad system, not just automating a tap. Device-level volume control
-is different in kind: the ad still plays start to finish, at whatever volume
-Spotify set it to, exactly as if nothing were watching - Spotify's own
-playback and ad-completion accounting are untouched. The only difference
-from a human not paying attention (or muting their phone themselves,
-something anyone can already do with zero help from this app) is that it
-happens automatically. Worth building on that basis, but this is a genuine
-scope expansion from what shipped, so it needs its own README section (not
-just quietly folded into the existing "no muting" line) explaining
-precisely what it does and doesn't touch, the same way every other
-feature here documents its own boundary.
+**Design correction made during implementation:** the original sketch
+above (now superseded) called for `AudioManager.setStreamVolume()` on
+`STREAM_MUSIC` directly. Checking Android's own documentation
+(developer.android.com/media/platform/output) before writing code turned
+up that this is explicitly discouraged: `AudioManager` mixes every app
+sharing a stream together, so muting `STREAM_MUSIC` directly would
+silence *every* app using that stream, not just Spotify. Audio focus is
+the real, targeted mechanism - this is why "check real docs before
+implementing an open question" mattered here, not just as a formality.
 
-**Rough design:**
-- New `SettingsRepository` toggle, `isAutoMuteEnabled` - almost certainly
-  default **off** until confirmed working against a real device, same
-  reasoning as `isDiagnosticLoggingEnabled` defaulting off: an unrequested
-  behavior change on first install is worse than an extra toggle to find.
-- Target `AudioManager.STREAM_MUSIC` specifically (what Spotify actually
-  plays over) - never `STREAM_RING`, `STREAM_NOTIFICATION`, etc.
-- Capture the current `STREAM_MUSIC` volume the moment an ad is first
-  detected (mirrors `hasAttemptedCurrentAd`'s "first detection of this ad"
-  edge, in `SpotifyAdSkipService`), mute (`setStreamVolume(..., 0, ...)`
-  or `adjustStreamVolume(ADJUST_MUTE, ...)`), then restore the captured
-  value - not just "unmute" - once "ad no longer detected" fires. Restoring
-  the literal captured value, not relying on whatever an unmute call
-  defaults to, matters: those don't reliably agree.
-- Needs its own real-device diagnostic-log validation before calling it
-  confirmed - same standard the ad/skip keyword lists were just held to,
-  not a different, lower bar just because it's a newer feature.
+**Still true from the original reasoning:** this never touches Spotify's
+own stream, network traffic, or ad-completion accounting - Spotify still
+plays every ad in full and gets credited for it, it just isn't the app
+with audio focus while that happens. See `AdAudioController`'s doc
+comment and README.md's Design philosophy section for the full boundary
+statement.
 
-**Open questions to resolve during implementation, not now:**
-1. Does `setStreamVolume`/`adjustStreamVolume` on `STREAM_MUSIC` need the
-   `MODIFY_AUDIO_SETTINGS` permission on the SDK levels this app targets
-   (min 24 / target 34)? Needs checking against real Android docs/a real
-   device at implementation time, not assumed either way.
-2. What should happen if the user manually adjusts volume *while* an ad
-   is playing (and thus already muted by this feature) - restore the
-   captured pre-ad volume anyway once the ad ends (overwriting their
-   manual change), or treat a manual change during the mute window as the
-   new value to restore? Either is defensible; needs a decision before
-   writing the restore logic, not an implicit answer buried in whichever
-   gets coded first.
-3. Interaction with the existing overlay: does the floating Download
-   button (or its container view) need any visual indicator that
-   auto-mute is currently active, or is Stats-only feedback (a new
-   "Muted for ad" stat, paralleling `recordSkipOutcome`) enough?
+**What's actually built:**
+- `app/src/main/java/com/spotblock/app/audio/AdAudioController.kt` -
+  `startMuting()`/`stopMuting()`, both idempotent (safe to call every
+  accessibility event without their own dedup tracking), handles both
+  the modern `AudioFocusRequest` API (26+) and the legacy
+  `requestAudioFocus(listener, streamType, durationHint)` path (24-25,
+  since minSdk is 24).
+- `SettingsRepository.isAutoMuteEnabled` - off by default, same
+  reasoning as `isDiagnosticLoggingEnabled`.
+- Wired into `SpotifyAdSkipService`: starts on first ad detection
+  (alongside the existing `hasAttemptedCurrentAd` gate), stops when the
+  ad clears, AND stops on `onInterrupt`/`onUnbind` - without that last
+  part, disabling the service mid-ad would leave Spotify permanently
+  ducked/paused with nothing left to ever release the focus request.
+- `StatsRepository.recordMuteOutcome()` / `MuteOutcome` (`ENGAGED`,
+  `FOCUS_REQUEST_DENIED`) and matching Stats screen counters/UI toggle,
+  mirroring the existing `SkipOutcome`/`DownloadOutcome` pattern.
+- Diagnostic Log gets a new `MUTE` tag paralleling `SKIP`/`DOWNLOAD`.
+
+**What's genuinely verified vs. not:** every file above was compiled
+(via a standalone Kotlin 1.9.24 compiler run against a real Android 14
+API jar - `org.robolectric:android-all` from Maven Central, since this
+sandbox can't reach `dl.google.com` to run the actual Gradle/Android
+build) and type-checks correctly against the real
+`AudioManager`/`AudioFocusRequest`/`AudioAttributes` API surface. That's
+real, meaningful verification - it is NOT the same as confirming Spotify
+actually pauses/ducks in response on a real device, which still needs a
+real-device diagnostic-log session before this can be called "confirmed"
+the way the ad/skip keyword defaults now are. `MainActivity.kt`'s two-line
+UI wiring couldn't be compiled the same way (needs the Gradle-generated
+`ActivityMainBinding` class) but follows the exact existing pattern of
+three already-working switches.
+
+**Resolved open questions (were listed here, now answered):**
+1. ~~Does `setStreamVolume` need `MODIFY_AUDIO_SETTINGS`?~~ Moot - this
+   no longer calls `setStreamVolume` at all, see above.
+2. ~~Manual volume change during the mute window?~~ Moot for the same
+   reason - there's no captured/restored volume value anymore, only a
+   focus request that's held then released.
+3. **Still open:** no visual overlay indicator for "currently silencing an
+   ad" - Stats-only feedback for now (`autoMuteEngagedText`/
+   `autoMuteFocusDeniedText`), consistent with how Skip/Download outcomes
+   are surfaced. Add a visual indicator later if Stats-only turns out to
+   be insufficient in practice.
 
 ## Play a local song during ads (instead of muting)
 
@@ -89,13 +101,15 @@ live detection state, not a pre-parsed duration. (Ad length/countdown
 actually needs it for something else, e.g. a Stats display - just not
 required here.)
 
-**Relationship to auto-mute above:** this feature supersedes auto-mute
-when both a track is configured AND enabled; auto-mute (or normal Spotify
-audio) is the fallback when no local track is configured/available. They
-should share the same detection wiring in `SpotifyAdSkipService`, not
-duplicate it - implement auto-mute first since it's the simpler primitive
-this builds on (capture/restore volume, ad-detected/cleared lifecycle),
-then extend rather than reimplementing that lifecycle.
+**Relationship to auto-mute (now built, see above):** this feature
+supersedes auto-mute when both a track is configured AND enabled;
+auto-mute (or normal Spotify audio) is the fallback when no local track
+is configured/available. `AdAudioController` already holds the
+focus-request/abandon lifecycle this needs (`startMuting`/`stopMuting`,
+called from the same `SpotifyAdSkipService` ad-detected/cleared points) -
+extend it to optionally start local playback alongside taking focus,
+rather than adding a second, parallel controller that duplicates the
+same lifecycle.
 
 **Rough design:**
 - New `SettingsRepository` fields: `isLocalMusicDuringAdsEnabled`

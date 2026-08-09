@@ -1,8 +1,9 @@
 <resources>
     <string name="app_name">Spot Block</string>
-    <string name="accessibility_service_description">Reads on-screen text while Spotify is open to detect when an ad is playing, and attempts to tap the Skip/Next control if one is available - never modifies audio, never touches the network.</string>
+    <string name="accessibility_service_description">Reads on-screen text while Spotify is open to detect when an ad is playing, and attempts to tap the Skip/Next control if one is available. Never touches Spotify\'s own audio stream or network traffic. Optionally (off by default) requests audio focus to pause/duck Spotify\'s own playback during an ad - see the app\'s README for details.</string>
 
     <string name="enable_ad_skip">Enable Ad Skip Attempts</string>
+    <string name="enable_auto_mute">Silence Ads (Audio Focus)</string>
     <string name="enable_overlay">Show Floating Download Button</string>
     <string name="open_accessibility_settings">Open Accessibility Settings</string>
     <string name="enable_diagnostic_logging">Enable Diagnostic Logging</string>
