@@ -13,11 +13,13 @@ This is a documented, intentional anti-skip mechanism, not a bug - ads are
 the actual exchange for free access, and Spotify designs against exactly
 this kind of tool working via its own UI. That means, honestly:
 
-- On **Spotify Free**, this app will very likely find the Skip control on
+- On **Spotify Free**, this app will often find the Skip control on
   screen but discover it's *disabled*, and log that instead of a fake
-  "success." Check **Stats** - if "Skip blocked" is climbing and "Skip
-  tapped" stays at zero, that's Spotify's own anti-skip design working as
-  intended, not a bug in this app.
+  "success" - though not always: one real session's diagnostic log
+  showed 4 of 6 real ad occurrences blocked this way, and 2 genuinely
+  tapped (see Known Open Items). Check **Stats** - if "Skip blocked" is
+  climbing and "Skip tapped" stays at zero, that's Spotify's own
+  anti-skip design working as intended, not a bug in this app.
 - On **Spotify Premium**, there are no ads at all, so this app has nothing
   to do.
 - This app deliberately does **not** attempt anything beyond tapping an
@@ -85,13 +87,14 @@ app. That means:
   keywords.** All three keyword lists (Ad Keywords, Skip Control Labels,
   Download Control Labels) are editable in the app without a rebuild for
   exactly this reason.
-- **The default keyword lists are best-effort guesses, not confirmed
-  against a real device.** Unlike TikTok Feed Filter (whose keyword lists
-  were tuned against real diagnostic logs during development), this project
-  has not yet been run against an actual Spotify installation. If ads don't
-  get detected at all, turn on **Diagnostic Log**, let an ad play, and check
-  what text Spotify actually rendered - then add that wording to Ad
-  Keywords.
+- **The default ad/skip keyword lists have now been confirmed against a
+  real device** (one real session, 6/6 real ad occurrences correctly
+  detected and skip-handled - see Known Open Items below for the exact
+  numbers). The Download Control Labels default has not been exercised
+  by real data yet, same open-item status as before. If something stops
+  matching in a future session, turn on **Diagnostic Log**, let it
+  happen, and check what text Spotify actually rendered - then add that
+  wording to the relevant keyword list.
 - **A Spotify UI update can silently break this** the same way a TikTok
   update could break the sibling project - if it stops working, the
   Diagnostic Log is the way to see what changed.
@@ -116,19 +119,39 @@ app. That means:
 
 ## Known open items
 
-- **No keyword list here has been confirmed against a real device.** This
-  is the single biggest gap versus the TikTok Feed Filter sibling project,
-  whose keywords were tuned from real diagnostic logs during development.
-  Expect to add wording after the first real use.
-- **Whether Spotify's Skip control is ever actually enabled during an ad**
-  (vs. always disabled on Free) is itself unconfirmed - it may vary by
-  region, ad format, or Spotify version. The Stats screen is the way to
-  find out for your actual account.
+- **The ad and skip keyword lists are now confirmed against a real
+  device.** A real diagnostic log (2,523 lines, one real session) showed
+  6 genuine ad occurrences. Every one was detected by the default
+  `Advertisement` keyword (6/6, including a video-ad variant that
+  renders `"Advertisement • 1 of 1"` with a bullet separator instead of
+  the audio-ad format's comma - both still matched, since it's a
+  substring check). Every one also found a Skip/Next control using the
+  default labels (6/6, zero `CONTROL_NOT_FOUND`) - **2 were actually
+  tapped, 4 came back `BLOCKED_DISABLED`.** That 2/6 "skip really was
+  enabled" rate is itself a real finding worth having: it's not the
+  rare exception the line below used to imply. Representative real
+  on-screen text from that log is now in
+  `AdDetectorTest.kt` (ad-related text only - the log's song/artist
+  text was excluded from what's committed here since that's personal
+  listening history, not needed to test ad detection). This was one
+  real session on one real device/account/region - it confirms the
+  defaults work, not that they're exhaustive; a UI variant, region, or
+  Spotify version this session didn't hit could still need a keyword
+  added later, the same way the sibling TikTok Feed Filter project's
+  lists have grown over time.
+- **Whether Spotify's Skip control is ever actually enabled during an
+  ad** is answered above for one real session: yes, sometimes - 2 of 6
+  real ad occurrences had it enabled, 4 didn't. Whether that ratio holds
+  generally (by region, ad format, Spotify version, or Free vs. one of
+  Spotify's other tiers) is still open - the Stats screen is the way to
+  keep tracking it for your own account over time.
 - **Spotify Lite / regional builds** may ship under a different package
   name than `com.spotify.music` - add it under Target App Packages in
   Setup if so.
-- **The Download Control Labels default (`Download`) is also unconfirmed.**
-  Same situation as the ad/skip keywords - if the floating Download button
-  logs "control not found" while you're genuinely on a playlist/album
-  screen with Premium active, check Diagnostic Log's `OVERLAY`/`DOWNLOAD`
-  entries for the real on-screen text and add the actual wording.
+- **The Download Control Labels default (`Download`) is still
+  unconfirmed** - the real log analyzed above didn't include any use of
+  the floating Download button, so this gap isn't closed the way the ad/
+  skip keywords are. If it logs "control not found" while you're
+  genuinely on a playlist/album screen with Premium active, check
+  Diagnostic Log's `OVERLAY`/`DOWNLOAD` entries for the real on-screen
+  text and add the actual wording.
