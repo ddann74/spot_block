@@ -2,11 +2,57 @@
 
 An Android accessibility-service app that watches Spotify's on-screen text for
 signs an ad is playing and, if it finds one, tries tapping the Skip/Next
-control - the same control you'd tap yourself. It never modifies audio, never
-intercepts or reverse-engineers Spotify's network traffic, and never acts on
-anything outside Spotify itself.
+control - the same control you'd tap yourself. It never intercepts or
+reverse-engineers Spotify's network traffic, never modifies Spotify's own
+audio stream, and never acts on anything outside Spotify itself. Two
+planned (not yet built - see `TODO.md`) features will have it manage the
+*device's own* local audio output during an ad instead - see **Design
+philosophy** below for why that's a deliberate, authorized exception.
 
 Planned (not yet built) work is tracked in [`TODO.md`](TODO.md).
+
+## Design philosophy
+
+Principles this project holds itself to:
+
+1. **Only automate a tap you could already make yourself.** Nothing here
+   does more than what a human could do by hand on the same screen.
+2. **Never lie about the outcome.** `SkipOutcome`/`DownloadOutcome` are
+   multi-state specifically so "tried and blocked" is never reported the
+   same as "worked."
+3. **Respect Spotify's own anti-skip design as intentional**, not a bug to
+   route around - `BLOCKED_DISABLED` is the expected outcome on Free, not
+   a failure state.
+4. **Never touch Spotify's own audio stream, network traffic, or data** -
+   no interception, no reverse-engineering, nothing that affects Spotify's
+   own playback or ad-completion accounting.
+5. **Never act outside the app's own configured scope** (target packages
+   only; no reading or acting on anything else on the device).
+6. **Heuristics must be transparent and correctable, not a black box** -
+   every keyword list is user-editable without a rebuild, and Diagnostic
+   Log exists specifically so a miss can be diagnosed and fixed.
+7. **Never claim more than what's actually verified** - a keyword list is
+   documented as "confirmed against a real device" only once it actually
+   has been, with the real numbers, not before.
+8. **A user-facing off switch for anything intrusive** - every added
+   capability gets its own toggle, defaulting to the least-surprising
+   state, rather than being bundled in as unavoidable.
+
+**Authorized expansion (2026-08-09):** principle 4 originally read "never
+modifies audio" without qualification. The project owner explicitly
+authorized broadening it to allow *device-level, local-only* audio
+control - muting the device's own media volume during a detected ad, and
+(planned, see `TODO.md`) substituting a locally-stored song for the ad's
+audio during that window. Both stay inside every other principle above
+unchanged: Spotify's own stream, network traffic, and ad-completion
+accounting are never touched - Spotify still plays the ad in full and
+gets credited for it exactly as if the app didn't exist. What changed is
+narrowly what happens to the device's own concurrent audio output during
+that window, which a user could already do manually (mute Spotify, open
+a different player, switch back) - this only automates that, per
+principle 1. Principle 4 is retired as originally worded; its
+network/stream/data half is now covered by this list's other principles
+(none of which changed), and its audio half is superseded by this note.
 
 ## Read this before installing
 
@@ -24,10 +70,12 @@ this kind of tool working via its own UI. That means, honestly:
   anti-skip design working as intended, not a bug in this app.
 - On **Spotify Premium**, there are no ads at all, so this app has nothing
   to do.
-- This app deliberately does **not** attempt anything beyond tapping an
-  on-screen control that's already there for you to tap - no audio
-  manipulation, no muting the stream, no modifying what Spotify sends your
-  device. That's a real, considered boundary, not a missing feature.
+- This app deliberately does **not** modify Spotify's own audio stream,
+  intercept or reverse-engineer its network traffic, or touch anything it
+  sends your device - see **Design philosophy** above for the full list
+  of boundaries, including one authorized, deliberate exception (local,
+  device-only audio control during ads - muting today, a planned local
+  music substitution in `TODO.md`) and why it doesn't cross the others.
 - Using any tool to circumvent ads likely violates Spotify's Terms of Use.
   This only automates a tap you already have the ability to make yourself
   when the control is enabled; it does not, and is not intended to,

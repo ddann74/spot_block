@@ -1,6 +1,11 @@
 # To do
 
 Planned, not yet built. Nothing in this file has any code behind it yet.
+Both features below rely on the same authorized, deliberate boundary
+change recorded in README.md's **Design philosophy** section
+(2026-08-09): device-level, local-only audio control during a detected
+ad is in scope; Spotify's own stream, network traffic, and ad-completion
+accounting are still never touched, unconditionally.
 
 ## Auto-mute during ads
 
@@ -59,3 +64,83 @@ feature here documents its own boundary.
    button (or its container view) need any visual indicator that
    auto-mute is currently active, or is Stats-only feedback (a new
    "Muted for ad" stat, paralleling `recordSkipOutcome`) enough?
+
+## Play a local song during ads (instead of muting)
+
+**What it does:** the same ad-detected/ad-cleared reaction as auto-mute
+above, but instead of going silent, plays a track from the user's own
+locally stored music for the duration of the ad, then hands audio back to
+Spotify once the ad clears.
+
+**Not literal audio layering.** "Insert a song over the top of the ad
+while it's playing" reads like mixing two audio streams simultaneously -
+that's not what this should do; two things playing at once through one
+speaker just sounds like noise. The actual mechanism: request Android
+audio focus (which causes Spotify to duck/pause its own output - normal
+OS-level behavior, nothing Spot Block does to Spotify directly), play the
+local track, then abandon focus so Spotify resumes. Net effect for the
+listener - ad audio replaced by their own music - without a messy overlay.
+
+**Doesn't need ad-length detection.** Reacts to the same "ad
+detected"/"ad no longer detected" signal `AdDetector`/`SpotifyAdSkipService`
+already produce, the same as auto-mute above - starts and stops based on
+live detection state, not a pre-parsed duration. (Ad length/countdown
+*is* present as unparsed text in `screenTexts` if a future feature
+actually needs it for something else, e.g. a Stats display - just not
+required here.)
+
+**Relationship to auto-mute above:** this feature supersedes auto-mute
+when both a track is configured AND enabled; auto-mute (or normal Spotify
+audio) is the fallback when no local track is configured/available. They
+should share the same detection wiring in `SpotifyAdSkipService`, not
+duplicate it - implement auto-mute first since it's the simpler primitive
+this builds on (capture/restore volume, ad-detected/cleared lifecycle),
+then extend rather than reimplementing that lifecycle.
+
+**Rough design:**
+- New `SettingsRepository` fields: `isLocalMusicDuringAdsEnabled`
+  (default **off**, same reasoning as every other toggle here) and a
+  stored URI (or list of URIs, if multiple tracks should be picked
+  from) for the local track(s) - chosen via the Storage Access Framework
+  (`ACTION_OPEN_DOCUMENT`/`ACTION_OPEN_DOCUMENT_TREE`) so this doesn't
+  need a broad storage-read permission, just a persisted URI permission
+  for whatever the user explicitly picks.
+- Playback via `MediaPlayer` (simplest fit for "play this one local
+  file") - `ExoPlayer` only worth it if this grows playlist/queue
+  features later, not needed for a v1.
+- Audio focus: request transient focus
+  (`AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK` or plain
+  `AUDIOFOCUS_GAIN_TRANSIENT`, decide which during implementation - MAY_DUCK
+  lets Spotify duck instead of fully pausing, which may or may not be
+  desired here) on ad-detected, `abandonAudioFocus`/
+  `AudioManager.OnAudioFocusChangeListener` release on ad-cleared.
+- Short fade-in/fade-out (via `MediaPlayer.setVolume` ramped over
+  ~200-300ms) on both transitions, so swaps aren't a jarring hard cut.
+- Fallback behavior, in order, if this feature is enabled but can't
+  actually play: no track configured -> fall back to auto-mute (if that's
+  also enabled) or do nothing; configured track's URI no longer resolves
+  (file moved/deleted, permission revoked) -> log a Stats entry saying so
+  (mirroring `recordSkipOutcome`'s "found but disabled" honesty - never
+  silently do nothing without saying why) and fall back the same way.
+- New `DiagnosticLog`/`StatsRepository` entries paralleling the existing
+  `SKIP`/`DOWNLOAD` pattern - e.g. a `LOCAL_AUDIO` tag with outcomes like
+  `PLAYED`, `NO_TRACK_CONFIGURED`, `TRACK_UNAVAILABLE`.
+- Needs its own real-device diagnostic-log validation before calling it
+  confirmed, same standard as everything else in this file.
+
+**Open questions to resolve during implementation, not now:**
+1. Single configured track (loops if the ad break outlasts it) vs. a
+   folder/playlist to pick from (random, or in order)? Simpler v1 is
+   probably one track, looped - decide before building the picker UI.
+2. Should the local track resume from where it left off across separate
+   ad breaks (feels more like "your own background music"), or always
+   restart from the beginning (simpler, more predictable)?
+3. `AUDIOFOCUS_GAIN_TRANSIENT` (Spotify fully pauses, cleanest swap) vs.
+   `..._MAY_DUCK` (Spotify keeps playing quietly underneath - defeats the
+   point of not hearing the ad) - this isn't actually a toss-up once
+   stated plainly; leaning `AUDIOFOCUS_GAIN_TRANSIENT`, but confirm
+   against real behavior since focus handling varies by Android version.
+4. Does this need `FOREGROUND_SERVICE`/media-session integration to play
+   reliably from an `AccessibilityService` context, or does simple
+   `MediaPlayer` playback work fine from there? Needs checking against
+   real Android docs/a real device, not assumed.
