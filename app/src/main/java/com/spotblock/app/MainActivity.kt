@@ -9,8 +9,10 @@ import android.provider.Settings
 import android.view.LayoutInflater
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import com.spotblock.app.databinding.ActivityMainBinding
@@ -32,6 +34,22 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** ACTION_OPEN_DOCUMENT_TREE via the modern ActivityResultContracts API
+      * (registered here, in onCreate-adjacent field-init, per its own
+      * requirement to register before the Activity reaches STARTED) - picks
+      * the local-music-during-ads folder (docs/TODO.md's resolved queue
+      * design: a whole folder, not individual files). `null` means the user
+      * backed out of the picker without choosing anything. */
+    private val pickAdMusicFolderLauncher = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri == null) return@registerForActivityResult
+        // Persists across reboots without re-picking - see
+        // SettingsRepository.localMusicFolderUri's doc comment.
+        contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        settingsRepository.localMusicFolderUri = uri
+        refreshLocalMusicFolderDisplay()
+        Toast.makeText(this, "Ad music folder set", Toast.LENGTH_SHORT).show()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -44,8 +62,11 @@ class MainActivity : AppCompatActivity() {
         setupListeners()
         binding.adSkipEnabledSwitch.isChecked = settingsRepository.isAdSkipEnabled
         binding.autoMuteEnabledSwitch.isChecked = settingsRepository.isAutoMuteEnabled
+        binding.localMusicEnabledSwitch.isChecked = settingsRepository.isLocalMusicDuringAdsEnabled
+        binding.localMusicVolumeSeekBar.progress = settingsRepository.localMusicVolumePercent
         binding.overlayEnabledSwitch.isChecked = settingsRepository.isOverlayEnabled
         binding.diagnosticLoggingSwitch.isChecked = settingsRepository.isDiagnosticLoggingEnabled
+        refreshLocalMusicFolderDisplay()
         renderAllLists()
         refreshStats()
     }
@@ -71,6 +92,19 @@ class MainActivity : AppCompatActivity() {
         binding.autoMuteEnabledSwitch.setOnCheckedChangeListener { _, isChecked ->
             settingsRepository.isAutoMuteEnabled = isChecked
         }
+        binding.localMusicEnabledSwitch.setOnCheckedChangeListener { _, isChecked ->
+            settingsRepository.isLocalMusicDuringAdsEnabled = isChecked
+        }
+        binding.chooseAdMusicFolderButton.setOnClickListener {
+            pickAdMusicFolderLauncher.launch(null)
+        }
+        binding.localMusicVolumeSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) settingsRepository.localMusicVolumePercent = progress
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
         binding.overlayEnabledSwitch.setOnCheckedChangeListener { _, isChecked ->
             settingsRepository.isOverlayEnabled = isChecked
         }
@@ -128,11 +162,27 @@ class MainActivity : AppCompatActivity() {
         binding.downloadControlNotFoundText.text = "Download control not found: ${statsRepository.downloadControlNotFound}"
         binding.autoMuteEngagedText.text = "Ads silenced (audio focus): ${statsRepository.autoMuteEngaged}"
         binding.autoMuteFocusDeniedText.text = "Silence attempt denied: ${statsRepository.autoMuteFocusDenied}"
+        binding.localAudioPlayedText.text = "Local music played: ${statsRepository.localAudioPlayed}"
+        binding.localAudioNoFolderText.text = "No folder configured: ${statsRepository.localAudioNoFolderConfigured}"
+        binding.localAudioFolderEmptyText.text = "Folder empty: ${statsRepository.localAudioFolderEmpty}"
+        binding.localAudioPermissionRevokedText.text = "Folder permission lost: ${statsRepository.localAudioPermissionRevoked}"
         val log = statsRepository.recentLog()
         binding.activityLogText.text = if (log.isEmpty()) "No activity yet" else log.joinToString("\n")
 
         val kilobytes = diagnosticLog.sizeBytes / 1024.0
         binding.diagnosticLogSizeText.text = "Diagnostic log: %.1f KB".format(kilobytes)
+    }
+
+    /** Shows the picked folder's path segment (readable enough - e.g.
+      * "primary:Music/AdBreak" - without needing a DocumentFile lookup
+      * just to display a name) or a clear "not set" state. */
+    private fun refreshLocalMusicFolderDisplay() {
+        val uri = settingsRepository.localMusicFolderUri
+        binding.adMusicFolderText.text = if (uri != null) {
+            "Ad music folder: ${uri.lastPathSegment ?: uri}"
+        } else {
+            "Ad music folder: not set"
+        }
     }
 
     private fun refreshAccessibilityStatus() {

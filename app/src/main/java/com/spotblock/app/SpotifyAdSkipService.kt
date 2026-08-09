@@ -10,6 +10,7 @@ import com.spotblock.app.ad.AdDetector
 import com.spotblock.app.ad.DownloadOutcome
 import com.spotblock.app.ad.SkipOutcome
 import com.spotblock.app.audio.AdAudioController
+import com.spotblock.app.audio.LocalAudioOutcome
 import com.spotblock.app.diagnostics.DiagnosticLog
 import com.spotblock.app.overlay.OverlayController
 
@@ -40,6 +41,13 @@ class SpotifyAdSkipService : AccessibilityService() {
     // instead of this one silently re-triggering on every screen update while
     // the same ad is still playing.
     private var hasAttemptedCurrentAd = false
+
+    // Separate from hasAttemptedCurrentAd: local-music playback may take a
+    // few accessibility events to actually start (AdMusicPlaybackService's
+    // foreground-service startup has real latency - see its doc comment),
+    // so this needs to keep being retried across events until it resolves
+    // to a real LocalAudioOutcome, not just attempted once like skip-tap.
+    private var hasResolvedLocalMusicForCurrentAd = false
 
     private val mainHandler = Handler(Looper.getMainLooper())
     // A single reusable Runnable so scheduling it again (or cancelling it) always
@@ -105,18 +113,37 @@ class SpotifyAdSkipService : AccessibilityService() {
         if (!evaluation.isAdPlaying) {
             if (hasAttemptedCurrentAd) {
                 diagnosticLog.log("AD", "ad no longer detected - ready for the next one")
-                if (settingsRepository.isAutoMuteEnabled) {
+                if (settingsRepository.isAutoMuteEnabled || settingsRepository.isLocalMusicDuringAdsEnabled) {
+                    adAudioController.stopLocalMusic()
                     adAudioController.stopMuting()
                     diagnosticLog.log("MUTE", "released audio focus")
                 }
             }
             hasAttemptedCurrentAd = false
+            hasResolvedLocalMusicForCurrentAd = false
             @Suppress("DEPRECATION")
             root.recycle()
             return
         }
 
         diagnosticLog.log("AD", "ad detected - matched=\"${evaluation.matchedKeyword}\" - texts=$texts")
+
+        // Local-music start (if enabled) runs on every event until it
+        // resolves - deliberately NOT gated behind hasAttemptedCurrentAd
+        // below, since AdMusicPlaybackService may not have finished
+        // starting up on the very first event. Cheap/idempotent to retry:
+        // AdAudioController.startLocalMusic() no-ops once already playing.
+        if (settingsRepository.isLocalMusicDuringAdsEnabled && !hasResolvedLocalMusicForCurrentAd) {
+            val localOutcome = adAudioController.startLocalMusic(
+                folderUri = settingsRepository.localMusicFolderUri,
+                targetVolume = settingsRepository.localMusicVolumePercent / 100f
+            )
+            if (localOutcome != null) {
+                diagnosticLog.log("LOCAL_AUDIO", "outcome=$localOutcome")
+                statsRepository.recordLocalAudioOutcome(localOutcome)
+                hasResolvedLocalMusicForCurrentAd = true
+            }
+        }
 
         if (hasAttemptedCurrentAd) {
             // Already tried for this ad - don't re-search/re-tap on every single
@@ -128,7 +155,10 @@ class SpotifyAdSkipService : AccessibilityService() {
         hasAttemptedCurrentAd = true
         statsRepository.recordAdDetected(evaluation.matchedKeyword!!)
 
-        if (settingsRepository.isAutoMuteEnabled) {
+        // Local music (above) also needs Spotify to be quiet to be heard -
+        // holds focus whenever EITHER toggle wants silence, not just when
+        // isAutoMuteEnabled specifically is on.
+        if (settingsRepository.isAutoMuteEnabled || settingsRepository.isLocalMusicDuringAdsEnabled) {
             val muteOutcome = adAudioController.startMuting()
             diagnosticLog.log("MUTE", "outcome=$muteOutcome")
             statsRepository.recordMuteOutcome(muteOutcome)
@@ -154,6 +184,7 @@ class SpotifyAdSkipService : AccessibilityService() {
         diagnosticLog.log("SERVICE", "onInterrupt")
         mainHandler.removeCallbacks(hideOverlayRunnable)
         overlayController.hide()
+        adAudioController.stopLocalMusic()
         adAudioController.stopMuting()
     }
 
@@ -164,11 +195,15 @@ class SpotifyAdSkipService : AccessibilityService() {
       * listener on a service instance Android is tearing down, until the process
       * happens to die. Same reasoning applies to held audio focus: without this,
       * disabling the service mid-ad would leave Spotify permanently ducked/paused
-      * with nothing left to ever release the focus request holding it that way. */
+      * with nothing left to ever release the focus request holding it that way.
+      * Same for local music: without stopping it here, AdMusicPlaybackService
+      * would keep playing indefinitely with no controller left to ever tell it
+      * to stop. */
     override fun onUnbind(intent: Intent?): Boolean {
         diagnosticLog.log("SERVICE", "onUnbind")
         mainHandler.removeCallbacks(hideOverlayRunnable)
         overlayController.hide()
+        adAudioController.stopLocalMusic()
         adAudioController.stopMuting()
         return super.onUnbind(intent)
     }

@@ -97,6 +97,68 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#2a2a2a"
+        android:padding="10dp"
+        android:layout_marginBottom="20dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/enable_local_music"
+                android:textColor="#ffffff"
+                android:textSize="14sp" />
+
+            <Switch
+                android:id="@+id/localMusicEnabledSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/adMusicFolderText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Ad music folder: not set"
+            android:textColor="#cccccc"
+            android:textSize="12sp"
+            android:layout_marginTop="8dp" />
+
+        <Button
+            android:id="@+id/chooseAdMusicFolderButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/choose_ad_music_folder"
+            android:layout_marginTop="6dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/local_music_volume"
+            android:textColor="#ffffff"
+            android:textSize="13sp"
+            android:layout_marginTop="10dp" />
+
+        <SeekBar
+            android:id="@+id/localMusicVolumeSeekBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="70" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:background="#2a2a2a"
@@ -404,6 +466,38 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Silence attempt denied: 0"
+        android:textColor="#ffffff"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/localAudioPlayedText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Local music played: 0"
+        android:textColor="#ffffff"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/localAudioNoFolderText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="No folder configured: 0"
+        android:textColor="#ffffff"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/localAudioFolderEmptyText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Folder empty: 0"
+        android:textColor="#ffffff"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/localAudioPermissionRevokedText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Folder permission lost: 0"
         android:textColor="#ffffff"
         android:textSize="13sp"
         android:layout_marginBottom="8dp" />

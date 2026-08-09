@@ -6,10 +6,10 @@ control - the same control you'd tap yourself. It never intercepts or
 reverse-engineers Spotify's network traffic, never modifies Spotify's own
 audio stream, and never acts on anything outside Spotify itself. It can
 also (optionally, off by default) request audio focus to pause/duck
-Spotify's own playback during an ad - see **Design philosophy** below for
-why that's a deliberate, authorized exception, not a contradiction. A
-further planned feature (playing a local song during that window instead
-of silence) is tracked in [`TODO.md`](TODO.md), not yet built.
+Spotify's own playback during an ad, and can optionally play music from a
+folder you choose during that same window instead of silence - see
+**Design philosophy** below for why that's a deliberate, authorized
+exception, not a contradiction.
 
 Planned (not yet built) work is tracked in [`TODO.md`](TODO.md).
 
@@ -46,8 +46,9 @@ authorized broadening it to allow *device-level, local-only* audio
 control - built today as requesting transient audio focus during a
 detected ad (causing Spotify to pause/duck itself, standard behavior for
 any well-behaved media app - not a direct volume/stream manipulation),
-and (planned, see `TODO.md`) extending that to play a locally-stored song
-during that same window instead of silence. Both stay inside every other
+and extending that to (optionally) play a locally-stored song during that
+same window instead of silence, once a folder is picked (see `TODO.md`
+for build details). Both stay inside every other
 principle above unchanged: Spotify's own stream, network traffic, and
 ad-completion accounting are never touched - Spotify still plays the ad
 in full and gets credited for it exactly as if the app didn't exist. What
@@ -78,8 +79,9 @@ this kind of tool working via its own UI. That means, honestly:
   intercept or reverse-engineer its network traffic, or touch anything it
   sends your device - see **Design philosophy** above for the full list
   of boundaries, including one authorized, deliberate exception (local,
-  device-only audio control during ads - muting today, a planned local
-  music substitution in `TODO.md`) and why it doesn't cross the others.
+  device-only audio control during ads - muting, or optionally playing
+  your own local music instead, both detailed in `TODO.md`) and why it
+  doesn't cross the others.
 - Using any tool to circumvent ads likely violates Spotify's Terms of Use.
   This only automates a tap you already have the ability to make yourself
   when the control is enabled; it does not, and is not intended to,
@@ -134,6 +136,45 @@ actually pauses/ducks the way expected needs a real diagnostic-log
 session to confirm. Stats screen shows "Ads silenced (audio focus)" /
 "Silence attempt denied" counters once you've tried it.
 
+## Play Local Music During Ads (off by default)
+
+An extension of Silence Ads above: instead of just going quiet, the app
+can play music from a folder on your device for the length of the ad,
+then hand focus back to Spotify once the ad clears.
+
+1. In **Setup**, tap **Choose Ad Music Folder** and pick a folder
+   containing audio files (via the system folder picker - no broad
+   storage permission needed, just scoped access to that one folder,
+   which persists across reboots).
+2. Turn on **Play Local Music During Ads**. It supersedes plain Silence
+   Ads whenever a folder is configured; if the folder becomes unavailable
+   partway through (permission revoked, or it turns out to be empty),
+   the app falls back to silence rather than pretending it played
+   something, and Stats/Diagnostic Log record which of those happened.
+3. Every audio file in the folder becomes the queue, played in filename
+   order. Each new ad restarts the queue at the first track; if the
+   queue runs out before the ad clears, it loops back to the start
+   rather than going silent partway through.
+4. Both transitions crossfade (roughly 350ms, equal-power curve) rather
+   than cutting hard - Spotify fades out as the local track fades in
+   going into the ad, and the reverse coming out of it.
+
+Playback runs through a dedicated `androidx.media3` (`ExoPlayer` +
+`MediaSessionService`) foreground service, required since Android has no
+visible Spot Block screen on-screen when an ad starts (Spotify is the
+foreground app) - see `TODO.md` for the full reasoning, including why
+`ExoPlayer` was chosen over the legacy `MediaPlayer` API.
+
+**Not yet confirmed on a real device**, same caveat as Silence Ads above
+- and with one additional verification gap specific to this feature: the
+`androidx.media3` dependency itself couldn't be compiled in this
+sandbox (Google-Maven-only, unreachable here), so `AdMusicPlaybackService`
+is unverified beyond careful manual review, unlike the rest of this
+feature's code which did compile against the real Android API. See
+`TODO.md`'s "What's genuinely verified vs. not" for the full breakdown.
+Stats screen shows "Local music played" / "No folder configured" /
+"Folder empty" / "Folder permission lost" counters once you've tried it.
+
 ## Download button (Spotify's own offline download)
 
 A floating **Download** button is drawn over Spotify (the same accessibility
@@ -183,6 +224,12 @@ app. That means:
   actual ad session the way the ad/skip keyword defaults have been. If
   you try it, check Stats' "Ads silenced" / "Silence attempt denied"
   counters and, ideally, a Diagnostic Log session afterward.
+- **Play Local Music During Ads is also unconfirmed on a real device**,
+  with a wider verification gap than the rest of this app - the
+  `androidx.media3` dependency it's built on couldn't be compiled in this
+  project's sandbox at all (unlike everything else, which did compile
+  against a real Android API jar). See `TODO.md` for the exact
+  file-by-file breakdown of what was and wasn't verified.
 
 ## Setup
 

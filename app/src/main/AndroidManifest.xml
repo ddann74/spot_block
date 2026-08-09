@@ -1,10 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- No permissions needed at all: the accessibility service reads on-screen
-         text via the accessibility APIs (granted separately, in Settings), only
-         ever taps a control already visible on screen, and never touches the
-         network or device storage. -->
+    <!-- The accessibility service itself still needs no permission beyond the
+         accessibility APIs (granted separately, in Settings): it only ever
+         taps a control already visible on screen, never touches the network,
+         and never reads device storage beyond the one folder the user
+         explicitly picks via the system folder picker below (which grants
+         its own scoped access - no broad storage permission needed for
+         that). These two permissions cover only the optional (off by
+         default), local-music-during-ads foreground service - see
+         AdMusicPlaybackService's doc comment and docs/TODO.md for why a
+         real foreground service is required, not just requested for its
+         own sake. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <application
         android:allowBackup="true"
@@ -34,6 +43,19 @@
             <meta-data
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- mediaPlayback-typed foreground service hosting the ExoPlayer instance
+             for local-music-during-ads (docs/TODO.md). exported="false": only this
+             app's own AdAudioController ever starts it - no other app has any
+             reason to bind to or start this service. -->
+        <service
+            android:name=".audio.AdMusicPlaybackService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
         </service>
 
         <!-- Lets "Share Diagnostic Log" hand the file to another app (email, Files,

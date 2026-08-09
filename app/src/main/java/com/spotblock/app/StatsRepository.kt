@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.spotblock.app.ad.DownloadOutcome
 import com.spotblock.app.ad.SkipOutcome
+import com.spotblock.app.audio.LocalAudioOutcome
 import com.spotblock.app.audio.MuteOutcome
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -24,6 +25,10 @@ class StatsRepository(context: Context) {
     val downloadControlNotFound: Int get() = prefs.getInt(KEY_DOWNLOAD_CONTROL_NOT_FOUND, 0)
     val autoMuteEngaged: Int get() = prefs.getInt(KEY_AUTO_MUTE_ENGAGED, 0)
     val autoMuteFocusDenied: Int get() = prefs.getInt(KEY_AUTO_MUTE_FOCUS_DENIED, 0)
+    val localAudioPlayed: Int get() = prefs.getInt(KEY_LOCAL_AUDIO_PLAYED, 0)
+    val localAudioNoFolderConfigured: Int get() = prefs.getInt(KEY_LOCAL_AUDIO_NO_FOLDER, 0)
+    val localAudioFolderEmpty: Int get() = prefs.getInt(KEY_LOCAL_AUDIO_FOLDER_EMPTY, 0)
+    val localAudioPermissionRevoked: Int get() = prefs.getInt(KEY_LOCAL_AUDIO_PERMISSION_REVOKED, 0)
 
     fun recentLog(): List<String> {
         val raw = prefs.getString(KEY_LOG, null) ?: return emptyList()
@@ -82,6 +87,33 @@ class StatsRepository(context: Context) {
         appendLogEntry(entry)
     }
 
+    /** Distinct outcome per problem, same "never lie about the outcome"
+      * principle as [recordSkipOutcome]/[recordDownloadOutcome]/
+      * [recordMuteOutcome] - an empty folder and a revoked permission are
+      * different problems with different fixes, so they get different
+      * counters/messages rather than one generic "didn't work." */
+    fun recordLocalAudioOutcome(outcome: LocalAudioOutcome) {
+        val entry = when (outcome) {
+            LocalAudioOutcome.PLAYED -> {
+                increment(KEY_LOCAL_AUDIO_PLAYED)
+                "Local music queue started for this ad"
+            }
+            LocalAudioOutcome.NO_FOLDER_CONFIGURED -> {
+                increment(KEY_LOCAL_AUDIO_NO_FOLDER)
+                "Local music enabled but no folder chosen - pick one in Setup"
+            }
+            LocalAudioOutcome.FOLDER_EMPTY -> {
+                increment(KEY_LOCAL_AUDIO_FOLDER_EMPTY)
+                "Chosen ad-music folder has no recognizable audio files in it"
+            }
+            LocalAudioOutcome.PERMISSION_REVOKED -> {
+                increment(KEY_LOCAL_AUDIO_PERMISSION_REVOKED)
+                "Lost access to the chosen ad-music folder - re-pick it in Setup"
+            }
+        }
+        appendLogEntry(entry)
+    }
+
     fun recordEvent(message: String) {
         appendLogEntry(message)
     }
@@ -110,6 +142,10 @@ class StatsRepository(context: Context) {
         private const val KEY_DOWNLOAD_CONTROL_NOT_FOUND = "download_control_not_found"
         private const val KEY_AUTO_MUTE_ENGAGED = "auto_mute_engaged"
         private const val KEY_AUTO_MUTE_FOCUS_DENIED = "auto_mute_focus_denied"
+        private const val KEY_LOCAL_AUDIO_PLAYED = "local_audio_played"
+        private const val KEY_LOCAL_AUDIO_NO_FOLDER = "local_audio_no_folder"
+        private const val KEY_LOCAL_AUDIO_FOLDER_EMPTY = "local_audio_folder_empty"
+        private const val KEY_LOCAL_AUDIO_PERMISSION_REVOKED = "local_audio_permission_revoked"
         private const val KEY_LOG = "recent_log"
         private const val MAX_LOG_ENTRIES = 50
     }

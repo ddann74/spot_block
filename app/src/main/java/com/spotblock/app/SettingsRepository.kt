@@ -2,6 +2,7 @@ package com.spotblock.app
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.net.Uri
 
 /**
  * All user-configurable settings - comma-separated strings rather than
@@ -29,6 +30,37 @@ class SettingsRepository(context: Context) {
     var isAutoMuteEnabled: Boolean
         get() = prefs.getBoolean(KEY_AUTO_MUTE_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_AUTO_MUTE_ENABLED, value).apply()
+
+    /** Off by default, same reasoning as [isAutoMuteEnabled] - this supersedes
+      * plain auto-mute when both this AND [localMusicFolderUri] are set (see
+      * TODO.md's "Play a local song during ads"): plays a queue of local
+      * files instead of leaving silence during an ad. Enabling this also
+      * implies audio focus should be held even if [isAutoMuteEnabled] itself
+      * is off - see SpotifyAdSkipService for that combined check, since local
+      * music inherently requires Spotify to be quiet to be heard, independent
+      * of whether the user separately wants silence-with-no-music. */
+    var isLocalMusicDuringAdsEnabled: Boolean
+        get() = prefs.getBoolean(KEY_LOCAL_MUSIC_ENABLED, false)
+        set(value) = prefs.edit().putBoolean(KEY_LOCAL_MUSIC_ENABLED, value).apply()
+
+    /** The user-picked folder (via ACTION_OPEN_DOCUMENT_TREE in MainActivity,
+      * which takes a persistable permission on it before storing here) whose
+      * audio files become the local-music queue. `null` if never picked -
+      * [com.spotblock.app.audio.AdAudioController.startLocalMusic] treats
+      * that as [com.spotblock.app.audio.LocalAudioOutcome.NO_FOLDER_CONFIGURED],
+      * not a guess at some default location. */
+    var localMusicFolderUri: Uri?
+        get() = prefs.getString(KEY_LOCAL_MUSIC_FOLDER_URI, null)?.let { Uri.parse(it) }
+        set(value) = prefs.edit().putString(KEY_LOCAL_MUSIC_FOLDER_URI, value?.toString()).apply()
+
+    /** 0-100, the local track's playback volume during the fade-in target
+      * (docs/TODO.md's normalization requirement: a hardcoded guess doesn't
+      * fit every source track's mastered loudness, so this is user-adjustable
+      * rather than fixed). Stored as an Int percentage since that's simpler to
+      * expose as a SeekBar than a raw 0f-1f Float preference. */
+    var localMusicVolumePercent: Int
+        get() = prefs.getInt(KEY_LOCAL_MUSIC_VOLUME_PERCENT, DEFAULT_LOCAL_MUSIC_VOLUME_PERCENT)
+        set(value) = prefs.edit().putInt(KEY_LOCAL_MUSIC_VOLUME_PERCENT, value.coerceIn(0, 100)).apply()
 
     /** Off by default - the diagnostic log is verbose (every screen evaluation, raw
       * on-screen text, every skip attempt and its outcome) by design, since that
@@ -117,6 +149,10 @@ class SettingsRepository(context: Context) {
         private const val PREFS_NAME = "spot_block_settings"
         private const val KEY_AD_SKIP_ENABLED = "ad_skip_enabled"
         private const val KEY_AUTO_MUTE_ENABLED = "auto_mute_enabled"
+        private const val KEY_LOCAL_MUSIC_ENABLED = "local_music_enabled"
+        private const val KEY_LOCAL_MUSIC_FOLDER_URI = "local_music_folder_uri"
+        private const val KEY_LOCAL_MUSIC_VOLUME_PERCENT = "local_music_volume_percent"
+        private const val DEFAULT_LOCAL_MUSIC_VOLUME_PERCENT = 70
         private const val KEY_DIAGNOSTIC_LOGGING_ENABLED = "diagnostic_logging_enabled"
         private const val KEY_TARGET_PACKAGES = "target_packages"
         private const val KEY_AD_KEYWORDS = "ad_keywords"

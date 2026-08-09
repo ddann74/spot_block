@@ -77,7 +77,7 @@ three already-working switches.
    are surfaced. Add a visual indicator later if Stats-only turns out to
    be insufficient in practice.
 
-## Play a local song during ads (instead of muting)
+## Play a local song during ads (instead of muting) - BUILT (2026-08-09), unverified on a real device
 
 **What it does:** the same ad-detected/ad-cleared reaction as auto-mute
 above, but instead of going silent, plays a track from the user's own
@@ -221,6 +221,78 @@ queue finishes first, it wraps back to track 1 rather than going silent.
   `FOLDER_EMPTY`, `PERMISSION_REVOKED`.
 - Needs its own real-device diagnostic-log validation before calling it
   confirmed, same standard as everything else in this file.
+
+**What's actually built:**
+- `app/src/main/java/com/spotblock/app/audio/LocalAudioLibrary.kt` (new) -
+  enumerates a picked folder's audio files via the raw
+  `android.provider.DocumentsContract` framework API (not the
+  `androidx.documentfile` convenience wrapper - see "What's genuinely
+  verified vs. not" below for why), filtered to `audio/*` MIME types,
+  sorted by display name. Returns a sealed `LocalAudioFolderResult`
+  (`Files`, `PermissionRevoked`, `FolderEmpty`) rather than throwing or
+  returning an ambiguous empty list, per the distinct-outcome requirement
+  in question 5 below.
+- `app/src/main/java/com/spotblock/app/audio/AdMusicPlaybackService.kt`
+  (new) - a `mediaPlayback`-typed `androidx.media3` `MediaSessionService`
+  hosting one `ExoPlayer`, per the resolved ExoPlayer-over-MediaPlayer
+  decision above. `handleAudioFocus = false` on its `AudioAttributes` -
+  `AdAudioController` already owns the single focus request, so ExoPlayer
+  is deliberately kept from requesting its own. Exposes
+  `playQueue()`/`stopQueue()`/`setVolume()`/`currentVolume()` plus a
+  same-process `instance` reference (no `MediaController` needed - this
+  service is only ever driven from inside this app's own process).
+- `AdAudioController` extended with `startLocalMusic()`/`stopLocalMusic()`,
+  an equal-power (sin/cos) crossfade via `ValueAnimator` (`fadeVolume()`,
+  ~350ms) for both directions per the fade requirement above, and a
+  `LocalAudioOutcome` enum (`PLAYED`, `NO_FOLDER_CONFIGURED`,
+  `FOLDER_EMPTY`, `PERMISSION_REVOKED`) - `null` is a distinct, transient
+  fourth case (service not started yet, see the race-condition note
+  below), not folded into any of the four real outcomes.
+- `SettingsRepository.isLocalMusicDuringAdsEnabled` / `localMusicFolderUri`
+  / `localMusicVolumePercent` (default 70%, off by default like every
+  other toggle here).
+- Wired into `SpotifyAdSkipService`: on ad-detected, attempts
+  `startLocalMusic()` on every accessibility event until it succeeds or
+  returns a real (non-`null`) outcome - not just once like the mute/skip
+  gates - because `AdMusicPlaybackService.onCreate()` (which sets
+  `instance`) runs asynchronously relative to `startForegroundService()`
+  returning, so the very first event after ad-detection can genuinely hit
+  the service before it's ready. A dedicated
+  `hasResolvedLocalMusicForCurrentAd` flag (separate from the existing
+  `hasAttemptedCurrentAd`) tracks this. Stops on ad-cleared, and on
+  `onInterrupt`/`onUnbind`, same as auto-mute.
+- `StatsRepository.recordLocalAudioOutcome()` and four new Stats counters,
+  and a `LOCAL_AUDIO` Diagnostic Log tag, mirroring `MuteOutcome`'s
+  pattern.
+- Setup screen: enable switch, "Choose Ad Music Folder" button (launches
+  `ActivityResultContracts.OpenDocumentTree()`, takes a persistable
+  read-permission grant), a volume `SeekBar`, and the folder's current
+  display name/"not set" state.
+- Manifest: `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_MEDIA_PLAYBACK`
+  permissions, and the `AdMusicPlaybackService` `<service>` declaration
+  (`android:foregroundServiceType="mediaPlayback"`, `exported="false"`).
+
+**What's genuinely verified vs. not:** `LocalAudioLibrary.kt`,
+`AdAudioController.kt`, `SettingsRepository.kt`, `StatsRepository.kt`, and
+`SpotifyAdSkipService.kt` all compiled (same standalone Kotlin 1.9.24 /
+real `android-all` jar technique used for auto-mute) and type-check
+against the real framework API surface they use. `AdMusicPlaybackService.kt`
+itself could **not** be compiled here - `androidx.media3` isn't reachable
+from this sandbox (Google-Maven-only, confirmed via a 404 from Maven
+Central), so this file is unverified beyond careful manual review against
+media3's documented public API. To still verify the *calling* code
+correctly, a scratch-only stub matching `AdMusicPlaybackService`'s real
+public method signatures (never committed) stood in for it while
+compile-checking `AdAudioController`/`SpotifyAdSkipService` - meaningful
+for catching call-site errors, but it cannot catch a mistake inside
+`AdMusicPlaybackService`'s own body. `MainActivity.kt`'s UI wiring
+couldn't be compiled either (needs the Gradle-generated
+`ActivityMainBinding`), but every new `binding.X` reference was manually
+cross-checked against `activity_main.xml`'s `android:id` values. None of
+this has been run on a real device - whether ExoPlayer actually plays,
+whether the foreground service starts in time, and whether the fade
+sounds right all still need a real-device session, the same as auto-mute
+above.
 
 **Open questions, resolved so far:**
 1. ~~Single track vs. folder/playlist?~~ Resolved above: folder, in
