@@ -132,18 +132,38 @@ queue finishes first, it wraps back to track 1 rather than going silent.
   queue. Re-enumerate each time the setting is opened/changed (files
   may be added/removed on disk between ad breaks) rather than caching
   the list indefinitely.
-- Playback via `MediaPlayer` (simplest fit here) with
-  `setOnCompletionListener` advancing to the next queue index (wrapping
-  to 0 at the end) and starting that track immediately - this is what
-  makes it a queue rather than one looping file. `ExoPlayer` isn't
-  needed for this; `MediaPlayer`'s completion callback is sufficient for
-  sequential playback.
-- Audio focus: request transient focus
-  (`AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK` or plain
-  `AUDIOFOCUS_GAIN_TRANSIENT`, decide which during implementation - MAY_DUCK
-  lets Spotify duck instead of fully pausing, which may or may not be
-  desired here) on ad-detected, `abandonAudioFocus`/
-  `AudioManager.OnAudioFocusChangeListener` release on ad-cleared.
+- **Playback via `androidx.media3` (ExoPlayer + `MediaSessionService`),
+  decided 2026-08-09 - not `MediaPlayer`.** Once the foreground-service
+  requirement below was confirmed necessary, building a hand-rolled FGS
+  around legacy `MediaPlayer` would mean solving two problems media3
+  already solves: (1) `MediaSessionService` absorbs most of the
+  foreground-service lifecycle correctness (start/stop timing, surviving
+  transient interruptions, hardening compliance) that Google's own docs
+  recommend it for specifically; (2) `ExoPlayer`'s native `MediaItem`
+  playlist support gives gapless queue advancement for free - build the
+  queue as a list of `MediaItem`s from the folder enumeration, set
+  repeat mode to loop the whole list, and `ExoPlayer` handles track
+  advancement and wraparound itself, rather than hand-rolling a
+  completion-listener index-advance loop that has an audible gap between
+  tracks (`MediaPlayer` has to fully release and re-prepare per file;
+  `ExoPlayer` doesn't). One real added dependency
+  (`media3-exoplayer`/`media3-session`) buys correctness on two
+  independently-risky pieces of this feature, not just convenience.
+  Restarting the queue at track 1 for each new ad (per the resolved
+  queue design above) means calling `seekToDefaultPosition(0)` (or
+  rebuilding the `MediaItem` list) at ad-start, not relying on wherever
+  playback happened to be left.
+- Audio focus: inherited from `AdAudioController`'s existing
+  `AUDIOFOCUS_GAIN_TRANSIENT` request (resolved question 3 above) - this
+  feature extends that controller's start/stop lifecycle rather than
+  requesting focus a second time. media3's `ExoPlayer` can also be
+  configured with `setAudioAttributes(..., handleAudioFocus = true)` to
+  manage focus itself, but doing so would conflict with
+  `AdAudioController` already owning that request - explicitly do NOT
+  let `ExoPlayer` self-manage focus here, since two independent focus
+  requests (one from `AdAudioController`, one from `ExoPlayer` itself)
+  for the same logical "silence Spotify for this ad" action would be
+  redundant and could interact unpredictably.
 - **Fade in/out on both transitions is a stated requirement, not a
   nicety** - the point of this feature is to preserve the listening
   experience through an ad break, and a hard cut in or out undermines
@@ -154,8 +174,9 @@ queue finishes first, it wraps back to track 1 rather than going silent.
     Symmetrically, local track fades **out** as Spotify's own audio
     fades back **in** once the ad clears - a crossfade on exit, not a
     fade-to-silence-then-resume.
-  - Ramp via `MediaPlayer.setVolume(left, right)` on a `Handler`-driven
-    step timer (or `ValueAnimator`), starting around ~300-500ms each
+  - Ramp via `ExoPlayer.volume` (a plain `Float` property, simpler to
+    animate than `MediaPlayer.setVolume(left, right)`'s two-channel
+    signature) on a `ValueAnimator`, starting around ~300-500ms each
     way - longer than the original ~200-300ms placeholder, since too
     fast still reads as an abrupt cut; tune against how it actually
     feels on a real device rather than picking one number and locking
@@ -173,7 +194,7 @@ queue finishes first, it wraps back to track 1 rather than going silent.
     rather than a hardcoded guess, since source tracks vary widely in
     mastered loudness.
 - **Requires a real foreground service - resolved 2026-08-09, see
-  question 4 below.** `MediaPlayer` playback is started from
+  question 4 below.** `ExoPlayer` playback is started from
   `AdAudioController`, which is driven by `SpotifyAdSkipService` (an
   `AccessibilityService`) - there's no visible Activity on screen when
   this fires (Spotify is in front, not Spot Block). A dedicated
@@ -236,14 +257,15 @@ queue finishes first, it wraps back to track 1 rather than going silent.
      ~10 minutes) rather than tearing it down and restarting on every
      brief pause; stop it for real once the ad clears and the queue
      isn't playing.
-   - `ExoPlayer`/media3's `MediaSessionService` would handle a lot of
-     this lifecycle automatically per Google's own recommendation - this
-     may be reason enough to revisit "plain `MediaPlayer`, `ExoPlayer`
-     only if this grows playlist features" above, since a real
-     foreground-service + queue-advancement lifecycle is arguably
-     already the more-than-trivial case that guidance was hedging on.
-     Worth reconsidering at implementation time rather than treating
-     the earlier "MediaPlayer is enough" call as final.
+   - **Decided (2026-08-09, see the Rough design section above):**
+     `ExoPlayer`/media3's `MediaSessionService`, not `MediaPlayer` - it
+     absorbs most of this foreground-service lifecycle per Google's own
+     recommendation, and its native playlist support also solves the
+     queue-advancement/gapless-transition half of this feature for free.
+     The earlier "`MediaPlayer` is enough, `ExoPlayer` only if this grows
+     playlist features" framing is retired - a real foreground-service +
+     queue lifecycle turned out to already be that more-than-trivial
+     case.
 
 **Still open:**
 5. What if the picked folder is empty or contains no recognizable audio
