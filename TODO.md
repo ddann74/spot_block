@@ -172,15 +172,32 @@ queue finishes first, it wraps back to track 1 rather than going silent.
     continuity) - likely a user-configurable gain/normalization value
     rather than a hardcoded guess, since source tracks vary widely in
     mastered loudness.
+- **Requires a real foreground service - resolved 2026-08-09, see
+  question 4 below.** `MediaPlayer` playback is started from
+  `AdAudioController`, which is driven by `SpotifyAdSkipService` (an
+  `AccessibilityService`) - there's no visible Activity on screen when
+  this fires (Spotify is in front, not Spot Block). A dedicated
+  `mediaPlayback`-typed foreground service must be started immediately
+  before playback begins and stopped when it ends (or the whole ad
+  window has cleared with the queue not currently playing) - not one
+  long-lived service for the app's whole lifetime, only for the actual
+  local-playback window, mirroring how `AdAudioController`'s focus
+  request/abandon is itself scoped to the ad window.
 - Fallback behavior, in order, if this feature is enabled but can't
-  actually play: no track configured -> fall back to auto-mute (if that's
-  also enabled) or do nothing; configured track's URI no longer resolves
-  (file moved/deleted, permission revoked) -> log a Stats entry saying so
-  (mirroring `recordSkipOutcome`'s "found but disabled" honesty - never
-  silently do nothing without saying why) and fall back the same way.
+  actually play: no folder configured -> fall back to auto-mute (if
+  that's also enabled) or do nothing; folder configured but empty / no
+  recognizable audio files inside -> its own distinct outcome, not
+  collapsed into "no folder configured" (see question 5, resolved
+  below) - same "never lie about the outcome" principle
+  `SkipOutcome`/`DownloadOutcome`/`MuteOutcome` already follow; folder's
+  persisted URI permission revoked -> also its own distinct outcome, not
+  the same message as "empty folder" (a revoked permission is fixable by
+  re-picking the folder; an empty folder is fixable by adding files -
+  different fixes need different messages).
 - New `DiagnosticLog`/`StatsRepository` entries paralleling the existing
-  `SKIP`/`DOWNLOAD` pattern - e.g. a `LOCAL_AUDIO` tag with outcomes like
-  `PLAYED`, `NO_TRACK_CONFIGURED`, `TRACK_UNAVAILABLE`.
+  `SKIP`/`DOWNLOAD`/`MUTE` pattern - a `LOCAL_AUDIO` tag with an outcome
+  enum covering (at least) `PLAYED`, `NO_FOLDER_CONFIGURED`,
+  `FOLDER_EMPTY`, `PERMISSION_REVOKED`.
 - Needs its own real-device diagnostic-log validation before calling it
   confirmed, same standard as everything else in this file.
 
@@ -190,17 +207,49 @@ queue finishes first, it wraps back to track 1 rather than going silent.
    the ad break.
 2. ~~Resume across ad breaks vs. restart?~~ Resolved above: always
    restarts at track 1.
-3. `AUDIOFOCUS_GAIN_TRANSIENT` vs. `..._MAY_DUCK` - already decided and
-   built this way for auto-mute (`AdAudioController` uses plain
+3. ~~`AUDIOFOCUS_GAIN_TRANSIENT` vs. `..._MAY_DUCK`?~~ Already decided
+   and built this way for auto-mute (`AdAudioController` uses plain
    `AUDIOFOCUS_GAIN_TRANSIENT`), so this feature inherits that choice by
    extending the same controller rather than re-deciding it.
+4. ~~Does this need `FOREGROUND_SERVICE`/media-session integration?~~
+   Resolved via real research (developer.android.com/about/versions/17/changes/bg-audio,
+   developer.android.com/develop/background-work/services/fgs/service-types),
+   not assumed: **yes.** Two separate, compounding reasons:
+   - Since Android 14 (this app's current `targetSdk`), any foreground
+     service used for media playback must declare
+     `android:foregroundServiceType="mediaPlayback"` and the app must
+     hold the `FOREGROUND_SERVICE_MEDIA_PLAYBACK` permission - a
+     baseline requirement for this kind of FGS regardless of the point
+     below.
+   - Android's newer "Background Audio Hardening" (rolling out in
+     Android 17 beta as of this research) specifically targets exactly
+     this app's scenario: an app with no visible Activity starting
+     audio playback from a background/service context. Apps must either
+     be on-screen or run a proper `mediaPlayback` foreground service -
+     there's no third option once that hardening is active on a user's
+     device. Given that, building this correctly from the start (rather
+     than "it happens to work today, deal with it breaking later") is
+     the right call, independent of exactly which Android version a
+     given install is running.
+   - Per Google's own lifecycle guidance: keep the FGS active through
+     transient interruptions (e.g. `AUDIOFOCUS_LOSS_TRANSIENT`, under
+     ~10 minutes) rather than tearing it down and restarting on every
+     brief pause; stop it for real once the ad clears and the queue
+     isn't playing.
+   - `ExoPlayer`/media3's `MediaSessionService` would handle a lot of
+     this lifecycle automatically per Google's own recommendation - this
+     may be reason enough to revisit "plain `MediaPlayer`, `ExoPlayer`
+     only if this grows playlist features" above, since a real
+     foreground-service + queue-advancement lifecycle is arguably
+     already the more-than-trivial case that guidance was hedging on.
+     Worth reconsidering at implementation time rather than treating
+     the earlier "MediaPlayer is enough" call as final.
 
 **Still open:**
-4. Does this need `FOREGROUND_SERVICE`/media-session integration to play
-   reliably from an `AccessibilityService` context, or does simple
-   `MediaPlayer` playback work fine from there? Needs checking against
-   real Android docs/a real device, not assumed.
 5. What if the picked folder is empty or contains no recognizable audio
-   files - fall back the same way as "no folder configured" (per the
-   fallback behavior above), or a distinct Stats/log message so it's
-   clear the folder itself is the problem, not a missing setting?
+   files - resolved above to get its own distinct outcome
+   (`FOLDER_EMPTY`), not collapsed into "no folder configured." Still
+   open: the exact user-facing wording, and whether it's worth
+   proactively validating the folder (and showing a warning) at pick
+   time in Setup, rather than only discovering it's empty the first
+   time an ad tries to use it.
