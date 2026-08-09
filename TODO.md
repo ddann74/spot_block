@@ -114,8 +114,34 @@ then extend rather than reimplementing that lifecycle.
   lets Spotify duck instead of fully pausing, which may or may not be
   desired here) on ad-detected, `abandonAudioFocus`/
   `AudioManager.OnAudioFocusChangeListener` release on ad-cleared.
-- Short fade-in/fade-out (via `MediaPlayer.setVolume` ramped over
-  ~200-300ms) on both transitions, so swaps aren't a jarring hard cut.
+- **Fade in/out on both transitions is a stated requirement, not a
+  nicety** - the point of this feature is to preserve the listening
+  experience through an ad break, and a hard cut in or out undermines
+  that as much as the ad itself would. Concretely:
+  - Local track fades **in** as Spotify is ducked/paused going into the
+    ad (not after - the two should overlap, so there's no dead silence
+    between "ad starts" and "local track audible").
+    Symmetrically, local track fades **out** as Spotify's own audio
+    fades back **in** once the ad clears - a crossfade on exit, not a
+    fade-to-silence-then-resume.
+  - Ramp via `MediaPlayer.setVolume(left, right)` on a `Handler`-driven
+    step timer (or `ValueAnimator`), starting around ~300-500ms each
+    way - longer than the original ~200-300ms placeholder, since too
+    fast still reads as an abrupt cut; tune against how it actually
+    feels on a real device rather than picking one number and locking
+    it in blind.
+  - Use an equal-power (roughly logarithmic/S-curve) fade rather than a
+    plain linear volume ramp - a linear ramp on `setVolume` sounds like
+    it changes loudness unevenly (perceived loudness isn't linear in
+    the volume parameter), so a straight `0.0 -> 1.0` step schedule
+    reads as a slower start / faster end than intended.
+  - Normalize the local track's playback volume to roughly match
+    typical Spotify listening volume before the fade-in even starts
+    (a quiet track fading "in" to something quieter than the ad was,
+    or a loud track overpowering it, both break the intended
+    continuity) - likely a user-configurable gain/normalization value
+    rather than a hardcoded guess, since source tracks vary widely in
+    mastered loudness.
 - Fallback behavior, in order, if this feature is enabled but can't
   actually play: no track configured -> fall back to auto-mute (if that's
   also enabled) or do nothing; configured track's URI no longer resolves
